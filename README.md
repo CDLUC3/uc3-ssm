@@ -10,6 +10,17 @@ When testing on a developer desktop or in an automated test environment, the SSM
 
 This code will be available as a Git Gem for use by UC3 applications.  This is not intended to be published to RubyGems.
 
+### TODO
+- gemify the code
+- test case - substitution value within a string
+  - "{!SSM: ROOT_PATH}/{!SSM: SUB_PATH}/log"
+- test case - value as json node
+  - "{SSM: FOO}"
+  - Value = {bar: 1, zip: 2}
+- write rspec tests
+- integrate into mrt-admin-lambda
+- integrate into mrt-dashboard
+
 ### See Also
 - https://github.com/terrywbrady/yaml (Java Implementation)
 - https://github.com/CDLUC3/uc3-aws-cli (Bash Implementation)
