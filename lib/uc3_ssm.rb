@@ -9,6 +9,9 @@ module Uc3Ssm
     REGEX = '\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}'
 
     def resolve_values(file)
+      raise Exception, "Config file #{name} not found!" unless File.exist?(path)
+      raise Exception, "Config file #{name} is empty!" if File.size(path) == 0
+
       config = YAML.load_file(file)
       resolve_value(config)
     end
