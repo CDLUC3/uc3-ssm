@@ -9,8 +9,8 @@ module Uc3Ssm
     REGEX = '\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}'
 
     def resolve_values(file)
-      raise Exception, "Config file #{name} not found!" unless File.exist?(path)
-      raise Exception, "Config file #{name} is empty!" if File.size(path) == 0
+      raise Exception, "Config file #{file} not found!" unless File.exist?(file)
+      raise Exception, "Config file #{file} is empty!" if File.size(file) == 0
 
       config = YAML.load_file(file)
       resolve_value(config)
@@ -41,7 +41,7 @@ module Uc3Ssm
     # Retrieve value for the string
     def resolve_string(obj)
       matched = obj.match(REGEX)
-      return obj unless matched.present?
+      return obj unless matched
 
       type, key, _x, defval = matched.captures
       puts "#{type} #{key.strip} #{defval.strip}"
