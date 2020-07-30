@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'test_helper'
-require 'uc3_ssm'
+#require 'uc3_ssm'
 
 class ConfigResolverTest < Minitest::Test
   def setup
