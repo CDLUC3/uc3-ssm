@@ -6,7 +6,11 @@ require 'aws-sdk-ssm'
 module Uc3Ssm
   # This code is designed to mimic https://github.com/terrywbrady/yaml/blob/master/config.yml
   class ConfigResolver
-    REGEX = '\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}'
+
+    def initialize
+      @REGEX = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
+      @SSM_ROOT_PATH = ENV.key?('SSM_ROOT_PATH') ? ENV['SSM_ROOT_PATH'] : ''
+    end
 
     def resolve_values(file)
       raise Exception, "Config file #{file} not found!" unless File.exist?(file)
@@ -30,26 +34,58 @@ module Uc3Ssm
 
     # Process each item in the array
     def resolve_array(obj)
-      obj.map { |v| resolve_value(v) }
+      arrcopy = []
+      obj.each do |v|
+        arrcopy.push(resolve_value(v))
+      end
+      arrcopy
     end
 
     # Traverse each item in the hash
     def resolve_hash(obj)
-      obj.each_value { |v| resolve_value(v) }
+      objcopy = {}
+      obj.each do |k, v|
+        objcopy[k] = resolve_value(v)
+      end
+      objcopy
+    end
+
+    def lookup_env(key, defval)
+      return ENV[key] if ENV.key?(key)
+      return defval if defval && defval != ''
+      raise Exception "Environment variable #{key} not found, no default provided"
+    end
+
+    def lookup_ssm(key, defval)
+      key = "#{@SSM_ROOT_PATH}#{key}"
+      begin
+        retrieve_ssm_value(key.strip)
+      rescue
+        return defval if defval && defval != ''
+        raise Exception "SSM key #{key} not found, no default provided"
+      end
     end
 
     # Retrieve value for the string
     def resolve_string(obj)
-      matched = obj.match(REGEX)
+      matched = obj.match(@REGEX)
       return obj unless matched
 
-      type, key, _x, defval = matched.captures
-      puts "#{type} #{key.strip} #{defval.strip}"
-      return defval if defval.present?
-      return ENV[key] if type == 'ENV' && ENV.key?(key)
-      return obj unless type == 'SSM'
+      pre = matched.captures[0]
+      type = matched.captures[1]
+      key = matched.captures[2].strip
+      defval = matched.captures[4].strip
+      post = matched.captures[5]
 
-      retrieve_ssm_value(key) || obj
+      defval = defval.strip == '' ? nil : defval.strip
+      if type == 'ENV'
+        obj = "#{pre}#{lookup_env(key, defval)}#{post}"
+      elsif type == 'SSM'
+        obj = "#{pre}#{lookup_ssm(key, defval)}#{post}"
+      else
+        raise Exception "Invalid Type config lookup type #{type}"
+      end
+      resolve_string(obj)
     end
 
     # Attempt to retrieve the value from AWS SSM
