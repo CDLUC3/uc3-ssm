@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
 $LOAD_PATH.push File.expand_path('lib', __dir__)
-require 'uc3_ssm/version'
+require 'uc3-ssm/version'
 
 Gem::Specification.new do |spec|
-  spec.name        = 'uc3_ssm'
+  spec.name        = 'uc3-ssm'
   spec.version     = Uc3Ssm::VERSION
   spec.platform    = Gem::Platform::RUBY
   spec.authors     = ['Terry Brady']

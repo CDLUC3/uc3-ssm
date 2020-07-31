@@ -24,13 +24,13 @@ This code will be available as a Git Gem for use by UC3 applications.  This is n
 To run the tests run: `rake test`
 
 ### Building the gem
-To build and install the gem: `gem build uc3_ssm.gemspec`
+To build and install the gem: `gem build uc3-ssm.gemspec`
 
 ### Installation
-To install the gem (must be built first): `gem install uc3_ssm-[version].gem`
+To install the gem (must be built first): `gem install uc3-ssm-[version].gem`
 
 To install via Bundler:
-- add `gem 'uc3_ssm', git: 'https://github.com/CDLUC3/uc3-ssm-gem', branch: 'main'` to your project's Gemfile
+- add `gem 'uc3-ssm', git: 'https://github.com/CDLUC3/uc3-ssm', branch: 'main'` to your project's Gemfile
 - add `require 'uc3_ssm'` to the appropriate place in your code
 
 Instructions on hooking this into Rails (possibly with dotenv) forthcoming
