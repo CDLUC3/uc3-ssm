@@ -31,7 +31,7 @@ To install the gem (must be built first): `gem install uc3-ssm-[version].gem`
 
 To install via Bundler:
 - add `gem 'uc3-ssm', git: 'https://github.com/CDLUC3/uc3-ssm', branch: 'main'` to your project's Gemfile
-- add `require 'uc3_ssm'` to the appropriate place in your code
+- add `require 'uc3-ssm'` to the appropriate place in your code
 
 Instructions on hooking this into Rails (possibly with dotenv) forthcoming
 
