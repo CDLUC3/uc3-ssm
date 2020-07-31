@@ -12,13 +12,19 @@ module Uc3Ssm
       @SSM_ROOT_PATH = ENV.key?('SSM_ROOT_PATH') ? ENV['SSM_ROOT_PATH'] : ''
     end
 
-    def resolve_values(file)
+    def resolve_file_values(file)
       raise Exception, "Config file #{file} not found!" unless File.exist?(file)
       raise Exception, "Config file #{file} is empty!" if File.size(file) == 0
 
       config = YAML.load_file(file)
       resolve_value(config)
     end
+
+    def resolve_hash_values(config)
+      resolve_value(config)
+    end
+
+    private
 
     # Walk the Hash object examining every value
     # Treat values containing {!ENV: key} or {!SSM: path} as special
@@ -29,8 +35,6 @@ module Uc3Ssm
 
       obj
     end
-
-    private
 
     # Process each item in the array
     def resolve_array(obj)
