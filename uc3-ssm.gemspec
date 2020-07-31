@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
 
   spec.summary     = 'UC3 - Credential store for AWS SSM'
   spec.description = 'Provides access to the AWS SSM credential store for Ruby'
-  spec.homepage    = 'https://github.com/CDLUC3/uc3-ssm-gem'
+  spec.homepage    = 'https://github.com/CDLUC3/uc3-ssm'
   spec.license     = 'MIT'
 
   spec.files         = Dir['lib/**/*'] + %w[README.md]
