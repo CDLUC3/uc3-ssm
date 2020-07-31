@@ -8,6 +8,5 @@ gemspec
 gem 'yaml'
 gem 'aws-sdk-ssm'
 
-group :test do
-  gem 'faker'
-end
+gem 'rspec'
+gem 'byebug'
