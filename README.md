@@ -10,21 +10,12 @@ When testing on a developer desktop or in an automated test environment, the SSM
 
 This code will be available as a Git Gem for use by UC3 applications.  This is not intended to be published to RubyGems.
 
-### TODO
-- test case - substitution value within a string
-  - "{!SSM: ROOT_PATH}/{!SSM: SUB_PATH}/log"
-- test case - value as json node
-  - "{SSM: FOO}"
-  - Value = {bar: 1, zip: 2}
-- write MiniTest tests - https://github.com/seattlerb/minitest
-- integrate into mrt-admin-lambda
-- integrate into mrt-dashboard
-
 ### Running Tests
-To run the tests run: `rake test`
+To run the tests run: `rspec`
 
 ### Building the gem
-To build and install the gem: `gem build uc3-ssm.gemspec`
+To build and install the gem: `gem build uc3-ssm.gemspec`.
+The gem is automatically built with GitHub actions.
 
 ### Installation
 To install the gem (must be built first): `gem install uc3-ssm-[version].gem`
@@ -38,8 +29,6 @@ Another install approach (from a client project)
 gem install specific_install
 gem specific_install -l https://github.com/CDLUC3/uc3-ssm
 ```
-
-Instructions on hooking this into Rails (possibly with dotenv) forthcoming
 
 ### See Also
 - https://github.com/terrywbrady/yaml (Java Implementation)
