@@ -13,8 +13,8 @@ module Uc3Ssm
     end
 
     def resolve_file_values(file)
-      raise Exception, "Config file #{file} not found!" unless File.exist?(file)
-      raise Exception, "Config file #{file} is empty!" if File.size(file) == 0
+      raise Exception.new, "Config file #{file} not found!" unless File.exist?(file)
+      raise Exception.new, "Config file #{file} is empty!" unless File.size(file) > 0
 
       config = YAML.load_file(file)
       resolve_value(config)
@@ -57,17 +57,15 @@ module Uc3Ssm
     def lookup_env(key, defval)
       return ENV[key] if ENV.key?(key)
       return defval if defval && defval != ''
-      raise Exception "Environment variable #{key} not found, no default provided"
+      raise Exception.new "Environment variable #{key} not found, no default provided"
     end
 
     def lookup_ssm(key, defval)
       key = "#{@SSM_ROOT_PATH}#{key}"
-      begin
-        retrieve_ssm_value(key.strip)
-      rescue
-        return defval if defval && defval != ''
-        raise Exception "SSM key #{key} not found, no default provided"
-      end
+      val = retrieve_ssm_value(key.strip)
+      return val if val
+      return defval if defval && defval != ''
+      raise Exception.new "SSM key #{key} not found, no default provided"
     end
 
     # Retrieve value for the string
@@ -77,8 +75,8 @@ module Uc3Ssm
 
       pre = matched.captures[0]
       type = matched.captures[1]
-      key = matched.captures[2].strip
-      defval = matched.captures[4].strip
+      key = matched.captures[2] ? matched.captures[2].strip : ''
+      defval = matched.captures[4] ? matched.captures[4].strip : ''
       post = matched.captures[5]
 
       defval = defval.strip == '' ? nil : defval.strip
@@ -87,7 +85,8 @@ module Uc3Ssm
       elsif type == 'SSM'
         obj = "#{pre}#{lookup_ssm(key, defval)}#{post}"
       else
-        raise Exception "Invalid Type config lookup type #{type}"
+        # Based on the Regex, this should never occur
+        raise Exception.new "Invalid Type config lookup type #{type}"
       end
       resolve_string(obj)
     end
@@ -95,7 +94,7 @@ module Uc3Ssm
     # Attempt to retrieve the value from AWS SSM
     def retrieve_ssm_value(key)
       ssm = Aws::SSM::Client.new
-      ssm.get_parameter(name: key)[:parameter][:value]
+      json = ssm.get_parameter(name: key)[:parameter][:value]
     rescue StandardError => e
       puts "Cannot read SSM parameter #{key} - #{e.message}"
       nil
