@@ -16,6 +16,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
   before(:each) do
     @resolver = Uc3Ssm::ConfigResolver.new
     @resolver_def = Uc3Ssm::ConfigResolver.new("NOT_APPLICABLE")
+    @resolver_prefix = Uc3Ssm::ConfigResolver.new("NOT_APPLICABLE", "us-west-2", "/root/path/")
   end
 
   def new_mock_ssm
@@ -194,6 +195,18 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     mock_ssm(mockSSM, 'TESTUC3_SSM1', '100')
     config_in[:a] = "{!SSM: TESTUC3_SSM1 !DEFAULT: def}"
     config = @resolver.resolve_hash_values(config_in)
+    expect(config[:a]).to eq('100')
+    expect(config[:b][0]).to eq('hi')
+    expect(config[:c][:d]).to eq(3)
+    expect(config[:c][:e][1]).to eq(2)
+  end
+
+  it 'Test SSM substitution with root path passed to resolver' do
+    config_in = get_basic_hash
+    mockSSM = new_mock_ssm
+    mock_ssm(mockSSM, '/root/path/TESTUC3_SSM1', '100')
+    config_in[:a] = "{!SSM: TESTUC3_SSM1 !DEFAULT: def}"
+    config = @resolver_prefix.resolve_hash_values(config_in)
     expect(config[:a]).to eq('100')
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq(3)
