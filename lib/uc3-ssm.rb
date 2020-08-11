@@ -7,9 +7,11 @@ module Uc3Ssm
   # This code is designed to mimic https://github.com/terrywbrady/yaml/blob/master/config.yml
   class ConfigResolver
 
-    def initialize
+    def initialize(def_value = nil, region = nil, ssm_root_path = '')
       @REGEX = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
-      @SSM_ROOT_PATH = ENV.key?('SSM_ROOT_PATH') ? ENV['SSM_ROOT_PATH'] : ''
+      @SSM_ROOT_PATH = ENV.key?('SSM_ROOT_PATH') ? ENV['SSM_ROOT_PATH'] : ssm_root_path
+      @DEF_VALUE = def_value
+      ENV['AWS_REGION']=region if region
     end
 
     def resolve_file_values(file)
@@ -57,6 +59,8 @@ module Uc3Ssm
     def lookup_env(key, defval)
       return ENV[key] if ENV.key?(key)
       return defval if defval && defval != ''
+      puts "Environment variable #{key} not found, no default provided"
+      return @DEF_VALUE if @DEF_VALUE
       raise Exception.new "Environment variable #{key} not found, no default provided"
     end
 
@@ -65,6 +69,8 @@ module Uc3Ssm
       val = retrieve_ssm_value(key.strip)
       return val if val
       return defval if defval && defval != ''
+      puts "SSM key #{key} not found, no default provided"
+      return @DEF_VALUE if @DEF_VALUE
       raise Exception.new "SSM key #{key} not found, no default provided"
     end
 
