@@ -15,8 +15,6 @@ module Uc3Ssm
 
   # This code is designed to mimic https://github.com/terrywbrady/yaml/blob/master/config.yml
   class ConfigResolver
-    attr_accessor :logger, :region
-
     def initialize(**options)
       dflt_regex = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
       dflt_ssm_root_path = ENV.key?('SSM_ROOT_PATH') ? ENV['SSM_ROOT_PATH'] : ''
