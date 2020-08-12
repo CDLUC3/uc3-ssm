@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 module Uc3Ssm
-  # UC3 SSM initializer that intercepts calls for ENV['key'] and attempts to
-  # retrieve the value from SSM first
+  # UC3 SSM initializer that retrives credentials from the SSM store and makes
+  # them available to your Rails application
   class Application < Rails::Application
     # Instantiate the Uc3Ssm::ConfigResolver if this is not the dev/test env
     if Rails.env.test? || Rails.env.development?
