@@ -15,8 +15,12 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
 
   before(:each) do
     @resolver = Uc3Ssm::ConfigResolver.new
-    @resolver_def = Uc3Ssm::ConfigResolver.new("NOT_APPLICABLE")
-    @resolver_prefix = Uc3Ssm::ConfigResolver.new("NOT_APPLICABLE", "us-west-2", "/root/path/")
+    @resolver_def = Uc3Ssm::ConfigResolver.new(def_value: "NOT_APPLICABLE")
+    @resolver_prefix = Uc3Ssm::ConfigResolver.new(
+      def_value: "NOT_APPLICABLE",
+      region: "us-west-2",
+      ssm_root_path: "/root/path/"
+    )
   end
 
   def new_mock_ssm
@@ -49,7 +53,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
 
   it 'Test Basic static values' do
     config_in = get_basic_hash
-    config = @resolver.resolve_hash_values(config_in)
+    config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq(1)
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq(3)
@@ -57,7 +61,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
   end
 
   it 'Test Basic static values from file' do
-    config = @resolver.resolve_file_values('spec/test/test.yml')
+    config = @resolver.resolve_file_values(file: 'spec/test/test.yml')
     expect(config['a']).to eq(1)
     expect(config['b'][0]).to eq('hi')
     expect(config['c']['d']).to eq(3)
@@ -66,7 +70,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
 
   it 'Test Empty Yaml' do
     expect {
-      config = @resolver.resolve_file_values('spec/test/empty.yml')
+      config = @resolver.resolve_file_values(file: 'spec/test/empty.yml')
     }.to raise_exception("Config file spec/test/empty.yml is empty!")
   end
 
@@ -74,7 +78,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     config_in = get_basic_hash
     config_in[:a] = "{!ENV: TESTUC3_SSM_ENV1 !DEFAULT: def}"
     config_in[:b][0] = "{!SSM: TESTUC3_SSM2 !DEFAULT: def2}"
-    config = @resolver.resolve_hash_values(config_in)
+    config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('def')
     expect(config[:b][0]).to eq('def2')
     expect(config[:c][:d]).to eq(3)
@@ -85,14 +89,14 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     config_in = get_basic_hash
     config_in[:a] = "{!ENV: TESTUC3_SSM_ENV1}"
     expect {
-      config = @resolver.resolve_hash_values(config_in)
+      config = @resolver.resolve_hash_values(hash: config_in)
     }.to raise_exception("Environment variable TESTUC3_SSM_ENV1 not found, no default provided")
   end
 
   it 'Test No Default ENV Value - Global Default' do
     config_in = get_basic_hash
     config_in[:a] = "{!ENV: TESTUC3_SSM_ENV1}"
-    config = @resolver_def.resolve_hash_values(config_in)
+    config = @resolver_def.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('NOT_APPLICABLE')
   end
 
@@ -100,33 +104,82 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     config_in = get_basic_hash
     config_in[:b][0] = "{!SSM: TESTUC3_SSM2}"
     expect {
-      config = @resolver.resolve_hash_values(config_in)
+      config = @resolver.resolve_hash_values(hash: config_in)
     }.to raise_exception("SSM key TESTUC3_SSM2 not found, no default provided")
   end
 
   it 'Test No Default SSM Value - Global Default' do
     config_in = get_basic_hash
     config_in[:b][0] = "{!SSM: TESTUC3_SSM2}"
-    config = @resolver_def.resolve_hash_values(config_in)
+    config = @resolver_def.resolve_hash_values(hash: config_in)
     expect(config[:b][0]).to eq('NOT_APPLICABLE')
   end
 
   it 'Test ENV substitution' do
     config_in = get_basic_hash
     ENV['TESTUC3_SSM_ENV1'] = '100'
+    ENV['TESTUC3_SSM_ENV2'] = '400'
     config_in[:a] = "{!ENV: TESTUC3_SSM_ENV1 !DEFAULT: def}"
-    config = @resolver.resolve_hash_values(config_in)
+    config_in[:b][0] = "{!ENV: TESTUC3_SSM_ENV2 !DEFAULT: def2}"
+    config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('100')
-    expect(config[:b][0]).to eq('hi')
+    expect(config[:b][0]).to eq('400')
     expect(config[:c][:d]).to eq(3)
     expect(config[:c][:e][1]).to eq(2)
+  end
+
+  it 'Test ENV substitution of partially resolved hash (a)' do
+    config_in = get_basic_hash
+    ENV['TESTUC3_SSM_ENV1'] = '100'
+    ENV['TESTUC3_SSM_ENV2'] = '400'
+    config_in[:a] = "{!ENV: TESTUC3_SSM_ENV1 !DEFAULT: def}"
+    config_in[:b][0] = "{!ENV: TESTUC3_SSM_ENV2 !DEFAULT: def2}"
+    config = @resolver.resolve_hash_values(hash: config_in, resolve_key: :a)
+    expect(config[:a]).to eq('100')
+    expect(config[:b][0]).to eq('{!ENV: TESTUC3_SSM_ENV2 !DEFAULT: def2}')
+    expect(config[:c][:d]).to eq(3)
+    expect(config[:c][:e][1]).to eq(2)
+  end
+
+  it 'Test ENV substitution of partially resolved hash (b)' do
+    config_in = get_basic_hash
+    ENV['TESTUC3_SSM_ENV1'] = '100'
+    ENV['TESTUC3_SSM_ENV2'] = '400'
+    config_in[:a] = "{!ENV: TESTUC3_SSM_ENV1 !DEFAULT: def}"
+    config_in[:b][0] = "{!ENV: TESTUC3_SSM_ENV2 !DEFAULT: def2}"
+    config = @resolver.resolve_hash_values(hash: config_in, resolve_key: :b)
+    expect(config[:a]).to eq('{!ENV: TESTUC3_SSM_ENV1 !DEFAULT: def}')
+    expect(config[:b][0]).to eq('400')
+    expect(config[:c][:d]).to eq(3)
+    expect(config[:c][:e][1]).to eq(2)
+  end
+
+  it 'Test ENV substitution with return_val (a)' do
+    config_in = get_basic_hash
+    ENV['TESTUC3_SSM_ENV1'] = '100'
+    ENV['TESTUC3_SSM_ENV2'] = '400'
+    config_in[:a] = "{!ENV: TESTUC3_SSM_ENV1 !DEFAULT: def}"
+    config_in[:b][0] = "{!ENV: TESTUC3_SSM_ENV2 !DEFAULT: def2}"
+    config = @resolver.resolve_hash_values(hash: config_in, return_key: :a)
+    expect(config).to eq('100')
+  end
+
+  it 'Test ENV substitution with return_val (b)' do
+    config_in = get_basic_hash
+    ENV['TESTUC3_SSM_ENV1'] = '100'
+    ENV['TESTUC3_SSM_ENV2'] = '400'
+    config_in[:a] = "{!ENV: TESTUC3_SSM_ENV1 !DEFAULT: def}"
+    config_in[:b][0] = "{!ENV: TESTUC3_SSM_ENV2 !DEFAULT: def2}"
+    config = @resolver.resolve_hash_values(hash: config_in, return_key: :b)
+    expect(config[0]).to eq('400')
+    expect(config[1]).to eq('bye')
   end
 
   it 'Test ENV substitution - No default' do
     config_in = get_basic_hash
     ENV['TESTUC3_SSM_ENV1'] = '100'
     config_in[:a] = "{!ENV: TESTUC3_SSM_ENV1}"
-    config = @resolver.resolve_hash_values(config_in)
+    config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('100')
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq(3)
@@ -137,7 +190,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     config_in = get_basic_hash
     ENV['TESTUC3_SSM_ENV1'] = '100'
     config_in[:b][0] = "{!ENV: TESTUC3_SSM_ENV1 !DEFAULT: def}"
-    config = @resolver.resolve_hash_values(config_in)
+    config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq(1)
     expect(config[:b][0]).to eq('100')
     expect(config[:c][:d]).to eq(3)
@@ -148,7 +201,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     config_in = get_basic_hash
     ENV['TESTUC3_SSM_ENV1'] = '100'
     config_in[:c][:d] = "{!ENV: TESTUC3_SSM_ENV1 !DEFAULT: def}"
-    config = @resolver.resolve_hash_values(config_in)
+    config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq(1)
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq('100')
@@ -159,7 +212,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     config_in = get_basic_hash
     ENV['TESTUC3_SSM_ENV1'] = '100'
     config_in[:c][:e][1] = "{!ENV: TESTUC3_SSM_ENV1 !DEFAULT: def}"
-    config = @resolver.resolve_hash_values(config_in)
+    config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq(1)
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq(3)
@@ -170,7 +223,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     config_in = get_basic_hash
     ENV['TESTUC3_SSM_ENV1'] = '100'
     config_in[:a] = "aaa{!ENV: TESTUC3_SSM_ENV1 !DEFAULT: def}bbb"
-    config = @resolver.resolve_hash_values(config_in)
+    config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('aaa100bbb')
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq(3)
@@ -182,7 +235,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     ENV['TESTUC3_SSM_ENV2'] = 'path/'
     ENV['TESTUC3_SSM_ENV1'] = '100'
     config_in[:a] = "AA/{!ENV: TESTUC3_SSM_ENV2 !DEFAULT: def}{!ENV: TESTUC3_SSM_ENV1 !DEFAULT: def}/ccc"
-    config = @resolver.resolve_hash_values(config_in)
+    config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('AA/path/100/ccc')
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq(3)
@@ -194,7 +247,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     mockSSM = new_mock_ssm
     mock_ssm(mockSSM, 'TESTUC3_SSM1', '100')
     config_in[:a] = "{!SSM: TESTUC3_SSM1 !DEFAULT: def}"
-    config = @resolver.resolve_hash_values(config_in)
+    config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('100')
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq(3)
@@ -206,7 +259,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     mockSSM = new_mock_ssm
     mock_ssm(mockSSM, '/root/path/TESTUC3_SSM1', '100')
     config_in[:a] = "{!SSM: TESTUC3_SSM1 !DEFAULT: def}"
-    config = @resolver_prefix.resolve_hash_values(config_in)
+    config = @resolver_prefix.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('100')
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq(3)
@@ -218,7 +271,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     mockSSM = new_mock_ssm
     mock_ssm(mockSSM, 'TESTUC3_SSM1', '100')
     config_in[:a] = "{!SSM: TESTUC3_SSM1}"
-    config = @resolver.resolve_hash_values(config_in)
+    config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('100')
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq(3)
@@ -231,7 +284,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     mock_ssm(mockSSM, 'TESTUC3_SSM1', 'path/')
     mock_ssm(mockSSM, 'TESTUC3_SSM2', 'subpath')
     config_in[:a] = "AA/{!SSM: TESTUC3_SSM1 !DEFAULT: def}{!SSM: TESTUC3_SSM2 !DEFAULT: def2}/bb.txt"
-    config = @resolver.resolve_hash_values(config_in)
+    config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('AA/path/subpath/bb.txt')
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq(3)
@@ -244,7 +297,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     mock_ssm(mockSSM, 'TESTUC3_SSM1', 'path/')
     ENV['TESTUC3_SSM_ENV2'] = 'envpath'
     config_in[:a] = "AA/{!SSM: TESTUC3_SSM1 !DEFAULT: def}{!ENV: TESTUC3_SSM_ENV2 !DEFAULT: def2}/bb.txt"
-    config = @resolver.resolve_hash_values(config_in)
+    config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('AA/path/envpath/bb.txt')
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq(3)
@@ -253,7 +306,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
 
   it 'File Not Found' do
     expect {
-      config = @resolver.resolve_file_values('spec/test/not-found.yml')
+      config = @resolver.resolve_file_values(file: 'spec/test/not-found.yml')
     }.to raise_exception("Config file spec/test/not-found.yml not found!")
   end
 end

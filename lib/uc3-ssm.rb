@@ -7,26 +7,48 @@ module Uc3Ssm
   # This code is designed to mimic https://github.com/terrywbrady/yaml/blob/master/config.yml
   class ConfigResolver
 
-    def initialize(def_value = nil, region = nil, ssm_root_path = '')
+    # def_value - value to return if no default is configured.  This prevents an exception from being thrown.
+    # region - region to perform the SSM lookup.  Not needed if AWS_REGION is configured.
+    # ssm_root_path - prefix to apply to all key lookups.  This allows the same config to be used in prod and non prod environments.
+    def initialize(def_value: nil, region: nil, ssm_root_path: '')
       @REGEX = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
       @SSM_ROOT_PATH = ENV.key?('SSM_ROOT_PATH') ? ENV['SSM_ROOT_PATH'] : ssm_root_path
       @DEF_VALUE = def_value
       ENV['AWS_REGION']=region if region
     end
 
-    def resolve_file_values(file)
+    # file - config file to process
+    # resolve_key - partially process config file using this as a root key - use this to prevent unnecessary lookups
+    # return_key - return values for a specific hash key - use this to filter the return object
+    def resolve_file_values(file:, resolve_key: nil, return_key: nil)
       raise Exception.new, "Config file #{file} not found!" unless File.exist?(file)
       raise Exception.new, "Config file #{file} is empty!" unless File.size(file) > 0
 
       config = YAML.load_file(file)
-      resolve_value(config)
+      resolve_hash_values(hash: config, resolve_key: resolve_key, return_key: return_key)
     end
 
-    def resolve_hash_values(config)
-      resolve_value(config)
+    # hash - config hash file to process
+    # resolve_key - partially process config file using this as a root key - use this to prevent unnecessary lookups
+    # return_key - return values for a specific hash key - use this to filter the return object
+    def resolve_hash_values(hash:, resolve_key: nil, return_key: nil)
+      if resolve_key and hash.key?(resolve_key)
+        rethash = hash.clone
+        rethash[resolve_key] = resolve_value(rethash[resolve_key])
+        return_hash(rethash, return_key)
+      else
+        rethash = resolve_value(hash)
+        return_hash(rethash, return_key)
+      end
     end
 
     private
+
+    def return_hash(hash, return_key = nil)
+      return hash unless return_key
+      return hash unless hash.key?(return_key)
+      hash[return_key]
+    end
 
     # Walk the Hash object examining every value
     # Treat values containing {!ENV: key} or {!SSM: path} as special
