@@ -49,8 +49,8 @@ module Uc3Ssm
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     end
 
-    def resolve_key(key)
-      retrieve_ssm_value(key)
+    def get_parameter(key)
+      retrieve_ssm_value("#{@ssm_root_path}#{key}")
     end
 
     private
@@ -85,20 +85,24 @@ module Uc3Ssm
 
     def lookup_env(key, defval)
       return ENV[key] if ENV.key?(key)
-      return defval if defval && defval != ''
-      puts "Environment variable #{key} not found, no default provided"
-      return @DEF_VALUE if @DEF_VALUE
-      raise Exception.new "Environment variable #{key} not found, no default provided"
+      return defval if defval.present?
+
+      @logger.warn "Environment variable #{key} not found, no default provided"
+      return @def_value if @def_value
+
+      raise ConfigResolverError, "Environment variable #{key} not found, no default provided"
     end
 
     def lookup_ssm(key, defval)
       key = "#{@ssm_root_path}#{key}"
       val = retrieve_ssm_value(key.strip)
       return val if val
-      return defval if defval && defval != ''
-      puts "SSM key #{key} not found, no default provided"
-      return @DEF_VALUE if @DEF_VALUE
-      raise Exception.new "SSM key #{key} not found, no default provided"
+      return defval if defval.present?
+
+      @logger.warn "SSM key #{key} not found, no default provided"
+      return @def_value if @def_value
+
+      raise ConfigResolverError, "SSM key #{key} not found, no default provided"
     end
 
     # Retrieve value for the string

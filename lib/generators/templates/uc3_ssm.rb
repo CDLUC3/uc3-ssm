@@ -8,19 +8,27 @@ module Uc3Ssm
     if Rails.env.test? || Rails.env.development?
       Rails.logger.info "Skipping UC3 SSM credential load for the #{Rails.env} environment."
     else
-      # Define the root path of your SSM credentials
-      ssm_root_path = '/uc3/[role]/[service]/'
+      Rails.logger.info 'Retriving UC3 SSM credentials'
 
-      # Define the appropriate env for the SSM path
-      aws_env = 'stg' if Rails.env.stage?
-      aws_env = 'prd' if Rails.env.production?
-      raise Uc3Ssm::ConfigResolverError, "Unknown Rails environment: #{Rails.env}." unless aws_env.present?
-
-      ssm_path = "#{ssm_root_path}#{aws_env}/"
-
-      Rails.logger.info "Retriving UC3 SSM credentials for #{ssm_path}"
+      # The UC3 SSSM gem expects your server to have the following env variables
+      # defined and works in conjunction with puppet and the shell script here:
+      #    https://github.com/CDLUC3/uc3-aws-cli/blob/main/.profile.d/uc3-aws-util.sh
+      #
+      # If you do not have these ENV variables set, then you may pass the appropriate
+      # values into the ConfigResolver initializer as follows:
+      #    ENV['REGION']          can be passed as: `region: 'us-west-2'`
+      #    ENV['SSM_ROOT_PATH']   can be passed as: `ssm_root_path: '/program/role/service/env/'`
+      #
+      # You can also pass in the following:
+      #    A Logger    e.g. `logger: Rails.logger` - default is STDOUT
+      #
+      # For example:
+      #   ssm_env = Rails.env.stage? ? 'stg' : 'prd'
+      #   ssm_root_path = "/uc3/dmp/hub/#{ssm_env}/"
+      #   resolver = Uc3Ssm::ConfigResolver.new(logger: Rails.logger, ssm_root_path: ssm_root_path)
 
       # You can also pass the region to the initializer, e.g. `region: 'us-west-2'`
+
       resolver = Uc3Ssm::ConfigResolver.new(logger: Rails.logger)
 
       # Map the SSM values to your config here. You can use the `resolver.resolve_key`
