@@ -30,6 +30,18 @@ gem install specific_install
 gem specific_install -l https://github.com/CDLUC3/uc3-ssm
 ```
 
+#### Rails installation:
+To install the gem in a Rails application:
+1. add the following to your Gemfile ```ruby
+  # UC3 SSM credential manager gem: https://github.com/CDLUC3/uc3-ssm
+  source 'https://rubygems.pkg.github.com/cdluc3' do
+    gem 'uc3-ssm', '~> 0.1'
+  end`
+  ```
+2. Run bundle install
+3. Install the UC3 SSM initializer to your config/initializers directory: `rails g uc3_ssm`
+4. Update the initializer for your application's needs
+
 ### See Also
 - https://github.com/terrywbrady/yaml (Java Implementation)
 - https://github.com/CDLUC3/uc3-aws-cli (Bash Implementation)
