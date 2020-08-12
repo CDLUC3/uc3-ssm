@@ -15,6 +15,8 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
 
   before(:each) do
     @resolver = Uc3Ssm::ConfigResolver.new
+    @resolver_def = Uc3Ssm::ConfigResolver.new("NOT_APPLICABLE")
+    @resolver_prefix = Uc3Ssm::ConfigResolver.new("NOT_APPLICABLE", "us-west-2", "/root/path/")
   end
 
   def new_mock_ssm
@@ -62,7 +64,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     expect(config['c']['e'][1]).to eq(2)
   end
 
-  it 'Test No Default ENV Value' do
+  it 'Test Empty Yaml' do
     expect {
       config = @resolver.resolve_file_values('spec/test/empty.yml')
     }.to raise_exception("Config file spec/test/empty.yml is empty!")
@@ -87,12 +89,26 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     }.to raise_exception("Environment variable TESTUC3_SSM_ENV1 not found, no default provided")
   end
 
+  it 'Test No Default ENV Value - Global Default' do
+    config_in = get_basic_hash
+    config_in[:a] = "{!ENV: TESTUC3_SSM_ENV1}"
+    config = @resolver_def.resolve_hash_values(config_in)
+    expect(config[:a]).to eq('NOT_APPLICABLE')
+  end
+
   it 'Test No Default SSM Value' do
     config_in = get_basic_hash
     config_in[:b][0] = "{!SSM: TESTUC3_SSM2}"
     expect {
       config = @resolver.resolve_hash_values(config_in)
     }.to raise_exception("SSM key TESTUC3_SSM2 not found, no default provided")
+  end
+
+  it 'Test No Default SSM Value - Global Default' do
+    config_in = get_basic_hash
+    config_in[:b][0] = "{!SSM: TESTUC3_SSM2}"
+    config = @resolver_def.resolve_hash_values(config_in)
+    expect(config[:b][0]).to eq('NOT_APPLICABLE')
   end
 
   it 'Test ENV substitution' do
@@ -179,6 +195,18 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     mock_ssm(mockSSM, 'TESTUC3_SSM1', '100')
     config_in[:a] = "{!SSM: TESTUC3_SSM1 !DEFAULT: def}"
     config = @resolver.resolve_hash_values(config_in)
+    expect(config[:a]).to eq('100')
+    expect(config[:b][0]).to eq('hi')
+    expect(config[:c][:d]).to eq(3)
+    expect(config[:c][:e][1]).to eq(2)
+  end
+
+  it 'Test SSM substitution with root path passed to resolver' do
+    config_in = get_basic_hash
+    mockSSM = new_mock_ssm
+    mock_ssm(mockSSM, '/root/path/TESTUC3_SSM1', '100')
+    config_in[:a] = "{!SSM: TESTUC3_SSM1 !DEFAULT: def}"
+    config = @resolver_prefix.resolve_hash_values(config_in)
     expect(config[:a]).to eq('100')
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq(3)

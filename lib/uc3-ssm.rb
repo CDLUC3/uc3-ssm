@@ -18,11 +18,14 @@ module Uc3Ssm
     attr_accessor :logger, :region
 
     def initialize(**options)
-      @regex = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
-      @ssm_root_path = ENV.key?('SSM_ROOT_PATH') ? ENV['SSM_ROOT_PATH'] : ''
+      dflt_regex = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
+      dflt_ssm_root_path = ENV.key?('SSM_ROOT_PATH') ? ENV['SSM_ROOT_PATH'] : ''
 
       @logger = options.fetch(:logger, Logger.new(STDOUT))
       @region = options.fetch(:region, 'us-west-2')
+      @regex = options.fetch(:regex, dflt_regex)
+      @ssm_root_path = options.fetch(:ssm_root_path, dflt_ssm_root_path)
+      @def_value = options.fetch(:def_value, '')
 
       @client = Aws::SSM::Client.new(region: @region)
     rescue Aws::Errors::MissingRegionError
@@ -85,8 +88,9 @@ module Uc3Ssm
     def lookup_env(key, defval)
       return ENV[key] if ENV.key?(key)
       return defval if defval && defval != ''
-
-      raise ConfigResolverError, "Environment variable #{key} not found, no default provided"
+      puts "Environment variable #{key} not found, no default provided"
+      return @DEF_VALUE if @DEF_VALUE
+      raise Exception.new "Environment variable #{key} not found, no default provided"
     end
 
     def lookup_ssm(key, defval)
@@ -94,8 +98,9 @@ module Uc3Ssm
       val = retrieve_ssm_value(key.strip)
       return val if val
       return defval if defval && defval != ''
-
-      raise ConfigResolverError, "SSM key #{key} not found, no default provided"
+      puts "SSM key #{key} not found, no default provided"
+      return @DEF_VALUE if @DEF_VALUE
+      raise Exception.new "SSM key #{key} not found, no default provided"
     end
 
     # Retrieve value for the string
