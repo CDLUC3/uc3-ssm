@@ -1,20 +1,37 @@
+# rubocop:disable Naming/FileName
 # frozen_string_literal: true
 
-require 'yaml'
 require 'aws-sdk-ssm'
+require 'logger'
+require 'yaml'
 
 module Uc3Ssm
+  # Uc3Ssm error
+  class ConfigResolverError < StandardError
+    def initialize(msg)
+      super("UC3 SSM Error: #{msg}")
+    end
+  end
+
   # This code is designed to mimic https://github.com/terrywbrady/yaml/blob/master/config.yml
   class ConfigResolver
+    attr_accessor :logger, :region
 
-    def initialize
-      @REGEX = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
-      @SSM_ROOT_PATH = ENV.key?('SSM_ROOT_PATH') ? ENV['SSM_ROOT_PATH'] : ''
+    def initialize(**options)
+      @regex = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
+      @ssm_root_path = ENV.key?('SSM_ROOT_PATH') ? ENV['SSM_ROOT_PATH'] : ''
+
+      @logger = options.fetch(:logger, Logger.new(STDOUT))
+      @region = options.fetch(:region, 'us-west-2')
+
+      @client = Aws::SSM::Client.new(region: @region)
+    rescue Aws::Errors::MissingRegionError
+      raise ConfigResolverError, 'No AWS region defined. Either set ENV["AWS_REGION"] or pass in `region: [region]`'
     end
 
     def resolve_file_values(file)
-      raise Exception.new, "Config file #{file} not found!" unless File.exist?(file)
-      raise Exception.new, "Config file #{file} is empty!" unless File.size(file) > 0
+      raise ConfigResolverError, "Config file #{file} not found!" unless File.exist?(file)
+      raise ConfigResolverError, "Config file #{file} is empty!" unless File.size(file).positive?
 
       config = YAML.load_file(file)
       resolve_value(config)
@@ -22,6 +39,17 @@ module Uc3Ssm
 
     def resolve_hash_values(config)
       resolve_value(config)
+    end
+
+    def get_parameters(**options)
+      resp = @client.get_parameters_by_path(options)
+      resp.present? && resp.parameters.any? ? resp.parameters : []
+    rescue Aws::Errors::MissingCredentialsError
+      raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
+    end
+
+    def resolve_key(key)
+      retrieve_ssm_value(key)
     end
 
     private
@@ -57,20 +85,23 @@ module Uc3Ssm
     def lookup_env(key, defval)
       return ENV[key] if ENV.key?(key)
       return defval if defval && defval != ''
-      raise Exception.new "Environment variable #{key} not found, no default provided"
+
+      raise ConfigResolverError, "Environment variable #{key} not found, no default provided"
     end
 
     def lookup_ssm(key, defval)
-      key = "#{@SSM_ROOT_PATH}#{key}"
+      key = "#{@ssm_root_path}#{key}"
       val = retrieve_ssm_value(key.strip)
       return val if val
       return defval if defval && defval != ''
-      raise Exception.new "SSM key #{key} not found, no default provided"
+
+      raise ConfigResolverError, "SSM key #{key} not found, no default provided"
     end
 
     # Retrieve value for the string
+    # rubocop:disable Metrics/AbcSize, Metrics/PerceivedComplexity, Metrics/MethodLength
     def resolve_string(obj)
-      matched = obj.match(@REGEX)
+      matched = obj.match(@regex)
       return obj unless matched
 
       pre = matched.captures[0]
@@ -86,18 +117,21 @@ module Uc3Ssm
         obj = "#{pre}#{lookup_ssm(key, defval)}#{post}"
       else
         # Based on the Regex, this should never occur
-        raise Exception.new "Invalid Type config lookup type #{type}"
+        raise ConfigResolverError, "Invalid Type config lookup type #{type}"
       end
       resolve_string(obj)
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/PerceivedComplexity, Metrics/MethodLength
 
     # Attempt to retrieve the value from AWS SSM
     def retrieve_ssm_value(key)
-      ssm = Aws::SSM::Client.new
-      json = ssm.get_parameter(name: key)[:parameter][:value]
+      @client.get_parameter(name: key)[:parameter][:value]
+    rescue Aws::Errors::MissingCredentialsError
+      raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     rescue StandardError => e
       puts "Cannot read SSM parameter #{key} - #{e.message}"
       nil
     end
   end
 end
+# rubocop:enable Naming/FileName
