@@ -14,13 +14,16 @@ module Uc3Ssm
   end
 
   # This code is designed to mimic https://github.com/terrywbrady/yaml/blob/master/config.yml
+  # rubocop:disable Metrics/ClassLength
   class ConfigResolver
+    # rubocop:disable Metrics/MethodLength
     def initialize(**options)
       dflt_regex = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
-      dflt_ssm_root_path = ENV.key?('SSM_ROOT_PATH') ? ENV['SSM_ROOT_PATH'] : ''
+      dflt_ssm_root_path = ENV['SSM_ROOT_PATH'] || ''
+      dflt_region = ENV['AWS_REGION'] || 'us-west-2'
 
       @logger = options.fetch(:logger, Logger.new(STDOUT))
-      @region = options.fetch(:region, 'us-west-2')
+      @region = options.fetch(:region, dflt_region)
       @regex = options.fetch(:regex, dflt_regex)
       @ssm_root_path = options.fetch(:ssm_root_path, dflt_ssm_root_path)
       @def_value = options.fetch(:def_value, '')
@@ -29,17 +32,27 @@ module Uc3Ssm
     rescue Aws::Errors::MissingRegionError
       raise ConfigResolverError, 'No AWS region defined. Either set ENV["AWS_REGION"] or pass in `region: [region]`'
     end
+    # rubocop:enable Metrics/MethodLength
 
     def resolve_file_values(file)
       raise ConfigResolverError, "Config file #{file} not found!" unless File.exist?(file)
       raise ConfigResolverError, "Config file #{file} is empty!" unless File.size(file).positive?
 
       config = YAML.load_file(file)
-      resolve_value(config)
+      resolve_hash_values(hash: config, resolve_key: resolve_key, return_key: return_key)
     end
 
-    def resolve_hash_values(config)
-      resolve_value(config)
+    # hash - config hash file to process
+    # resolve_key - partially process config file using this as a root key - use this to prevent unnecessary lookups
+    # return_key - return values for a specific hash key - use this to filter the return object
+    def resolve_hash_values(hash:, resolve_key: nil, return_key: nil)
+      if resolve_key && hash.key?(resolve_key)
+        rethash = hash.clone
+        rethash[resolve_key] = resolve_value(rethash[resolve_key])
+      else
+        rethash = resolve_value(hash)
+      end
+      return_hash(rethash, return_key)
     end
 
     # Retrieve all key+values for a path (using the ssm_root_path if none is specified)
@@ -59,6 +72,13 @@ module Uc3Ssm
     end
 
     private
+
+    def return_hash(hash, return_key = nil)
+      return hash unless return_key
+      return hash unless hash.key?(return_key)
+
+      hash[return_key]
+    end
 
     # Walk the Hash object examining every value
     # Treat values containing {!ENV: key} or {!SSM: path} as special
@@ -144,5 +164,6 @@ module Uc3Ssm
       raise ConfigResolverError, "Cannot read SSM parameter #{key} - #{e.message}"
     end
   end
+  # rubocop:enable Metrics/ClassLength
 end
 # rubocop:enable Naming/FileName
