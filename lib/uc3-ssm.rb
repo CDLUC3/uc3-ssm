@@ -13,7 +13,7 @@ module Uc3Ssm
     def initialize(def_value: nil, region: nil, ssm_root_path: '')
       @REGEX = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
       @SSM_ROOT_PATH = ENV.key?('SSM_ROOT_PATH') ? ENV['SSM_ROOT_PATH'] : ssm_root_path
-      @DEF_VALUE = def_value ? def_value : nil
+      @DEF_VALUE = def_value
       ENV['AWS_REGION']=region if region
     end
 
