@@ -19,8 +19,9 @@ Gem::Specification.new do |spec|
   spec.require_paths = ['lib']
   spec.required_ruby_version = '>= 2.4'
 
-  spec.add_runtime_dependency('aws-sdk-ssm', '1.84.0')
-  spec.add_runtime_dependency('yaml', '0.1.0')
+  spec.add_runtime_dependency('aws-sdk-ssm', '~> 1.84')
+  spec.add_runtime_dependency('logger', '~> 1.4')
+  spec.add_runtime_dependency('yaml', '~> 0.1')
 
   # Requirements for running RSpec
   spec.add_development_dependency('minitest', '5.14.1')
