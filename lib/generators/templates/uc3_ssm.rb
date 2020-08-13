@@ -31,15 +31,22 @@ module Uc3Ssm
 
       resolver = Uc3Ssm::ConfigResolver.new(logger: Rails.logger)
 
-      # Map the SSM values to your config here. You can use the `resolver.resolve_key`
-      # or `resolver.get_parameters` methods to access your values.
+      # Map the SSM values to your config here. You can use the `resolver.parameter_for_key`
+      # or `resolver.parameters_for_path` methods to access your values.
       #
-      # For setting an ENV variable:
-      #   ENV['MASTER_KEY'] = resolver.resolve_key("#{root_ssm_path}/master_key")
+      # Each of these methods will build off of your defined ENV['SSM_ROOT_PATH'] or
+      # the :ssm_root_path you specified in the call to `Uc3Ssm::ConfigResolver.new`
+      # So for example if your SSM_ROOT_PATH is `/uc3/role/service/env/` then
+      # you would just pass `my_key` or `my/path/` to these methods.
       #
-      # For traversing all parameters in a specific path:
-      #   resp = resolver.get_parameters(opts)
-      #   resp.each { |param| ENV[param.name.upcase] = param.value } if resp.is_a?(Array)
+      # For retrieving a specific configuration variable:
+      #   Rails.configuration.x.my_key = resolver.parameter_for_key("my_key")
+      #
+      # For retrieving all key+values in the specified path
+      # For available `options` you can pass to this method, see:
+      # https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html:
+      #   resp = resolver.parameters_for_path(recursive: true)
+      #   resp.each { |param| Rails.configuration.x[:"#{param.name.upcase}"] = param.value } if resp.is_a?(Array)
 
     end
   rescue Uc3Ssm::ConfigResolverError => e

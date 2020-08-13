@@ -42,14 +42,19 @@ module Uc3Ssm
       resolve_value(config)
     end
 
-    def get_parameters(**options)
+    # Retrieve all key+values for a path (using the ssm_root_path if none is specified)
+    # See https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html for
+    # details on available `options`
+    def parameters_for_path(**options)
+      options[:path] = @ssm_root_path unless options[:path].present?
       resp = @client.get_parameters_by_path(options)
       resp.present? && resp.parameters.any? ? resp.parameters : []
     rescue Aws::Errors::MissingCredentialsError
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     end
 
-    def get_parameter(key)
+    # Retrieve a value for a single key (e.g. `/uc3/role/service/env/key`)
+    def parameter_for_key(key)
       retrieve_ssm_value("#{@ssm_root_path}#{key}")
     end
 
@@ -136,8 +141,7 @@ module Uc3Ssm
     rescue Aws::Errors::MissingCredentialsError
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     rescue StandardError => e
-      puts "Cannot read SSM parameter #{key} - #{e.message}"
-      nil
+      raise ConfigResolverError, "Cannot read SSM parameter #{key} - #{e.message}"
     end
   end
 end
