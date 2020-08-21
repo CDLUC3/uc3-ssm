@@ -24,7 +24,7 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency('yaml', '~> 0.1')
 
   # Requirements for running RSpec
-  spec.add_development_dependency('minitest', '5.14.1')
-  spec.add_development_dependency('rake', '13.0.1')
+  spec.add_development_dependency('byebug', '11.1.3')
+  spec.add_development_dependency('rspec', '3.9.0')
   spec.add_development_dependency('rubocop', '0.88.0')
 end

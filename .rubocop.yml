@@ -1,0 +1,4 @@
+AllCops:
+  # We're using Ruby 2.4 right now. So force that version or higher.
+  # The version listed here should match whatever is specified in the gemspec
+  TargetRubyVersion: 2.4

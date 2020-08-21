@@ -16,9 +16,12 @@ module Uc3Ssm
   # This code is designed to mimic https://github.com/terrywbrady/yaml/blob/master/config.yml
   # rubocop:disable Metrics/ClassLength
   class ConfigResolver
-    # def_value - value to return if no default is configured.  This prevents an exception from being thrown.
-    # region - region to perform the SSM lookup.  Not needed if AWS_REGION is configured.
-    # ssm_root_path - prefix to apply to all key lookups.  This allows the same config to be used in prod and non prod environments.
+    # def_value - value to return if no default is configured.
+    #             This prevents an exception from being thrown.
+    # region - region to perform the SSM lookup.
+    #          Not needed if AWS_REGION is configured.
+    # ssm_root_path - prefix to apply to all key lookups.
+    #                 This allows the same config to be used in prod and non prod envs.
     # rubocop:disable Metrics/MethodLength
     def initialize(**options)
       dflt_regex = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
@@ -66,9 +69,9 @@ module Uc3Ssm
     # See https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html for
     # details on available `options`
     def parameters_for_path(**options)
-      options[:path] = @ssm_root_path unless options[:path].present?
+      options[:path] = @ssm_root_path if options[:path].nil?
       resp = @client.get_parameters_by_path(options)
-      resp.present? && resp.parameters.any? ? resp.parameters : []
+      !resp.nil? && resp.parameters.any? ? resp.parameters : []
     rescue Aws::Errors::MissingCredentialsError
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     end
@@ -83,6 +86,7 @@ module Uc3Ssm
     def return_hash(hash, return_key = nil)
       return hash unless return_key
       return hash unless hash.key?(return_key)
+
       hash[return_key]
     end
 
@@ -98,40 +102,36 @@ module Uc3Ssm
 
     # Process each item in the array
     def resolve_array(obj)
-      arrcopy = []
-      obj.each do |v|
-        arrcopy.push(resolve_value(v))
-      end
-      arrcopy
+      return [] if obj.nil?
+
+      obj.map { |item| resolve_value(item) }
     end
 
     # Traverse each item in the hash
     def resolve_hash(obj)
-      objcopy = {}
-      obj.each do |k, v|
-        objcopy[k] = resolve_value(v)
-      end
-      objcopy
+      return {} if obj.nil?
+
+      obj.map { |k, v| [k, resolve_value(v)] }.to_h
     end
 
-    def lookup_env(key, defval)
+    def lookup_env(key, defval = nil)
       return ENV[key] if ENV.key?(key)
-      return defval if defval.present?
+      return defval unless defval.nil?
 
       @logger.warn "Environment variable #{key} not found, no default provided"
-      return @def_value if @def_value
+      return @def_value unless @def_value.nil? || @def_value.strip == ''
 
       raise ConfigResolverError, "Environment variable #{key} not found, no default provided"
     end
 
-    def lookup_ssm(key, defval)
+    def lookup_ssm(key, defval = nil)
       key = "#{@ssm_root_path}#{key}"
       val = retrieve_ssm_value(key.strip)
-      return val if val
-      return defval if defval.present?
+      return val unless val.nil?
+      return defval unless defval.nil?
 
       @logger.warn "SSM key #{key} not found, no default provided"
-      return @def_value if @def_value
+      return @def_value unless @def_value.nil? || @def_value.strip == ''
 
       raise ConfigResolverError, "SSM key #{key} not found, no default provided"
     end
@@ -153,9 +153,6 @@ module Uc3Ssm
         obj = "#{pre}#{lookup_env(key, defval)}#{post}"
       elsif type == 'SSM'
         obj = "#{pre}#{lookup_ssm(key, defval)}#{post}"
-      else
-        # Based on the Regex, this should never occur
-        raise ConfigResolverError, "Invalid Type config lookup type #{type}"
       end
       resolve_string(obj)
     end
