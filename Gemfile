@@ -2,11 +2,5 @@
 
 source 'https://rubygems.org'
 
-# Specify your gem's dependencies in faker.gemspec
+# Specify your gem's dependencies in the gemspec
 gemspec
-
-gem 'yaml'
-gem 'aws-sdk-ssm'
-
-gem 'rspec'
-gem 'byebug'
