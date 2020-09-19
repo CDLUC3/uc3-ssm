@@ -23,6 +23,9 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
       region: 'us-west-2',
       ssm_root_path: '/root/path/'
     )
+    ENV['SSM_SKIP_RESOLUTION'] = 'Y'
+    @resolver_skip = Uc3Ssm::ConfigResolver.new
+    ENV.delete('SSM_SKIP_RESOLUTION')
     @no_ssm_error = 'UC3 SSM Error: No AWS credentials available. Make sure the server has access to the aws-sdk'
   end
 
@@ -469,6 +472,18 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     config_in[:a] = 'AA/{!SSM: TESTUC3_SSM1 !DEFAULT: def}{!ENV: TESTUC3_SSM_ENV2 !DEFAULT: def2}/bb.txt'
     config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('AA/path/envpath/bb.txt')
+    expect(config[:b][0]).to eq('hi')
+    expect(config[:c][:d]).to eq(3)
+    expect(config[:c][:e][1]).to eq(2)
+  end
+
+  it 'Test Compound SSM/ENV substitution - SSM_SKIP_RESOLUTION' do
+    config_in = basic_hash
+    mock_ssm('TESTUC3_SSM1', 'path/')
+    ENV['TESTUC3_SSM_ENV2'] = 'envpath'
+    config_in[:a] = 'AA/{!SSM: TESTUC3_SSM1 !DEFAULT: def}{!ENV: TESTUC3_SSM_ENV2 !DEFAULT: def2}/bb.txt'
+    config = @resolver_skip.resolve_hash_values(hash: config_in)
+    expect(config[:a]).to eq('AA/TESTUC3_SSM1envpath/bb.txt')
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq(3)
     expect(config[:c][:e][1]).to eq(2)

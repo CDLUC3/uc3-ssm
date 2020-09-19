@@ -27,6 +27,7 @@ module Uc3Ssm
       dflt_regex = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
       dflt_ssm_root_path = ENV['SSM_ROOT_PATH'] || ''
       dflt_region = ENV['AWS_REGION'] || 'us-west-2'
+      @ssm_skip_resolution = ENV.key?('SSM_SKIP_RESOLUTION')
 
       @logger = options.fetch(:logger, Logger.new(STDOUT))
 
@@ -35,7 +36,7 @@ module Uc3Ssm
       @ssm_root_path = options.fetch(:ssm_root_path, dflt_ssm_root_path)
       @def_value = options.fetch(:def_value, '')
 
-      @client = Aws::SSM::Client.new(region: @region)
+      @client = Aws::SSM::Client.new(region: @region) unless @ssm_skip_resolution
     rescue Aws::Errors::MissingRegionError
       raise ConfigResolverError, 'No AWS region defined. Either set ENV["AWS_REGION"] or pass in `region: [region]`'
     end
@@ -69,6 +70,7 @@ module Uc3Ssm
     # See https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html for
     # details on available `options`
     def parameters_for_path(**options)
+      return [] if @ssm_skip_resolution
       options[:path] = @ssm_root_path if options[:path].nil?
       resp = @client.get_parameters_by_path(options)
       !resp.nil? && resp.parameters.any? ? resp.parameters : []
@@ -160,6 +162,7 @@ module Uc3Ssm
 
     # Attempt to retrieve the value from AWS SSM
     def retrieve_ssm_value(key)
+      return key if @ssm_skip_resolution
       @client.get_parameter(name: key)[:parameter][:value]
     rescue Aws::Errors::MissingCredentialsError
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
