@@ -1,6 +1,157 @@
+# Resolve System Configuration with the AWS SSM Parameter Store
+
+Original System Configuration File
+
+```
+production:
+  user: username
+  password: secret_production_password
+  debug-level: error
+  hostname: my-prod-hostname
+
+stage:
+  user: username
+  password: secret_stage_password
+  debug-level: warning
+  hostname: my-stage-hostname
+
+local:
+  user: username
+  password: password
+  debug-level: info
+  hostname: localhost
+```
+
+1. Migrate secrets to SSM (`aws ssm put-parameter`)
+
+```
+/system/prod/app/db-password = secret_production_password
+/system/stage/app/db-password = secret_stage_password
+```
+
+Resulting in the following
+
+```
+production:
+  user: username
+  password: {!SSM: app/db-password} 
+  debug-level: error
+  hostname: my-prod-hostname
+
+stage:
+  user: username
+  password: {!SSM: app/db-password} 
+  debug-level: warning
+  hostname: my-stage-hostname
+
+local:
+  user: username
+  password: password
+  debug-level: info
+  hostname: localhost
+```
+
+2. Migrate Dynamic Properties to SSM
+
+```
+production:
+  user: username
+  password: {!SSM: app/db-password} 
+  debug-level: {!SSM: app/debug-level !DEFAULT: error} 
+  hostname: my-prod-hostname
+
+stage:
+  user: username
+  password: {!SSM: app/db-password} 
+  debug-level: {!SSM: app/debug-level !DEFAULT: warning}
+  hostname: my-stage-hostname
+
+local:
+  user: username
+  password: password
+  debug-level: info
+  hostname: localhost
+```
+
+3. Migrate non-secret, static values to ENV variables
+
+```
+production:
+  user: username
+  password: {!SSM: app/db-password} 
+  debug-level: {!SSM: app/debug-level !DEFAULT: error} 
+  hostname: {!ENV: HOSTNAME}
+
+stage:
+  user: username
+  password: {!SSM: app/db-password} 
+  debug-level: {!SSM: app/debug-level !DEFAULT: warning}
+  hostname: {!ENV: HOSTNAME}
+
+local:
+  user: username
+  password: {!ENV: DB_PASSWORD !DEFAULT: password}
+  debug-level: {!ENV: DEBUG_LEVEL !DEFAULT: info}
+  hostname: {!ENV: HOSTNAME !DEFAULT: localhost}
+```
+
+4. Yaml Consolidation (optional)
+_Utilize the same lookup keys for both production and stage_
+
+```
+default: &default
+  user: username
+  password: {!SSM: app/db-password} 
+  debug-level: {!SSM: app/debug-level !DEFAULT: error} 
+  hostname: {!ENV: HOSTNAME}
+
+stage:
+  <<: *default
+
+production:
+  <<: *default
+
+local:
+  user: username
+  password: {!ENV: DB_PASSWORD !DEFAULT: password}
+  debug-level: {!ENV: DEBUG_LEVEL !DEFAULT: info}
+  hostname: {!ENV: HOSTNAME !DEFAULT: localhost}
+```
+
+
+## Resolving the Configuration
+
+Run in production
+
+```
+export SSM_ROOT_PATH=/system/prod/
+export HOSTNAME=my-prod-hostname
+```
+
+Run in stage
+
+```
+export SSM_ROOT_PATH=/system/prod/
+export HOSTNAME=my-stage-hostname
+
+```
+
+Run locally -- bypass SSM resolution when not running on AWS
+
+```
+export SSM_SKIP_RESOLUTION=Y
+export HOSTNAME=localhost
+export DB_PASSWORD=password
+export DEBUG_LEVEL=info
+```
+
 ## Ruby library to pull some configuration from AWS SSM
 
-Input: YAML Config File
+Input: 
+- YAML Config File
+- ENVIRONMENT VARIABLE SSM_ROOT_PATH - this value will be prefixed to all keys
+- ENVIRONMENT VARIABLE SSM_SKIP_RESOLUTION - if set, no SSM values will be resolved
+
 Output: Hash object with values resolved from ENV variables and SSM parameters
 - {!ENV: ENV_VAR_NAME !DEFAULT: value if not found}
 - {!SSM: SSM_PATH !DEFAULT: value if not found}
@@ -34,17 +185,17 @@ require 'uc3-ssm'
 # name - config file to process
 # resolve_key - partially process config file using this as a root key - use this to prevent unnecessary lookups
 # return_key - return values for a specific hash key - use this to filter the return object
-def load_uc3_config(name:, resolve_key: nil, return_key: nil)
+def load_uc3_config(name:, return_key: nil)
   resolver = Uc3Ssm::ConfigResolver.new({
         def_value: "NOT_APPLICABLE",
         region: ENV.key?('AWS_REGION') ? ENV['AWS_REGION'] : "us-west-2",
         ssm_root_path: ENV.key?('SSM_ROOT_PATH') ? ENV['SSM_ROOT_PATH'] : "..."
     })
   path = File.join(Rails.root, 'config', name)
-  resolver.resolve_file_values(file: path, resolve_key: resolve_key, return_key: return_key)
+  resolver.resolve_file_values(file: path, return_key: return_key)
 end
 
-APP_CONFIG = load_uc3_config(name: 'app_config.yml', resolve_key: Rails.env, return_key: Rails.env)
+APP_CONFIG = load_uc3_config(name: 'app_config.yml', return_key: Rails.env)
 ```
 
 config/application.rb - add the following
@@ -67,7 +218,7 @@ Example of directly retrieving API credentials from SSM
 Add the following to your Gemfile
 ```
 source "https://rubygems.pkg.github.com/cdluc3" do
-  gem "uc3-ssm", "0.1.4"
+  gem "uc3-ssm", "0.1.8"
 end
 ```
 
