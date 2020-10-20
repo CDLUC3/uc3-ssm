@@ -1,6 +1,6 @@
 # Resolve System Configuration with the AWS SSM Parameter Store
 
-Original System Configuration File
+## Original System Configuration File
 
 ```
 production:
@@ -22,7 +22,7 @@ local:
   hostname: localhost
 ```
 
-1. Migrate secrets to SSM (`aws ssm put-parameter`)
+## Step 1. Migrate secrets to SSM (`aws ssm put-parameter`)
 
 ```
 /system/prod/app/db-password = secret_production_password
@@ -51,7 +51,9 @@ local:
   hostname: localhost
 ```
 
-2. Migrate Dynamic Properties to SSM
+## Step 2. Migrate Dynamic Properties to SSM
+
+_Run `aws ssm put-parameter` to change the debug level.  Note: the application must implement a mechanism to reload configuration on demand in order to use dynamic properties._
 
 ```
 production:
@@ -73,7 +75,9 @@ local:
   hostname: localhost
 ```
 
-3. Migrate non-secret, static values to ENV variables
+## Step 3. Migrate non-secret, static values to ENV variables
+
+_Use SSM where it provides benefit. Otherwise, ENV variables are a simpler, more portable choice._
 
 ```
 production:
@@ -95,8 +99,9 @@ local:
   hostname: {!ENV: HOSTNAME !DEFAULT: localhost}
 ```
 
-4. Yaml Consolidation (optional)
-_Utilize the same lookup keys for both production and stage_
+## Step 4. Yaml Consolidation (optional)
+
+_It is now possible to utilize the same lookup keys for both production and stage_
 
 ```
 default: &default
