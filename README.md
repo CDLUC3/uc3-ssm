@@ -2,6 +2,8 @@
 
 ## Original System Configuration File
 
+_The following example file illustrates how Merritt is using the SSM Parameter Resolver_
+
 ```
 production:
   user: username
@@ -236,7 +238,7 @@ gem specific_install -l https://github.com/CDLUC3/uc3-ssm
 ```
 
 ### See Also
-- https://github.com/terrywbrady/yaml (Java Implementation)
+- https://github.com/CDLUC3/mrt-core2/tree/master/tools/ (Java Implementation)
 - https://github.com/CDLUC3/uc3-aws-cli (Bash Implementation)
 
 --
