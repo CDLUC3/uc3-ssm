@@ -138,7 +138,7 @@ export HOSTNAME=my-prod-hostname
 Run in stage
 
 ```
-export SSM_ROOT_PATH=/system/prod/
+export SSM_ROOT_PATH=/system/stage/
 export HOSTNAME=my-stage-hostname
 
 ```
