@@ -147,7 +147,7 @@ module Uc3Ssm
       pre = matched.captures[0]
       type = matched.captures[1]
       key = matched.captures[2] ? matched.captures[2].strip : ''
-      defval = matched.captures[4] ? matched.captures[4].strip : ''
+      defval = matched.captures[4] ? matched.captures[4].strip : @def_value
       post = matched.captures[5]
 
       defval = defval.strip == '' ? nil : defval.strip
