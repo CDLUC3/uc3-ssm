@@ -81,21 +81,27 @@ module Uc3Ssm
       path_list.each do |root_path|
         options[:path] = root_path
         resp = @client.get_parameters_by_path(options)
-        param_list += !resp.nil? && resp.parameters.any? ? resp.parameters : []
+        param_list += resp.parameters if !resp.nil? && resp.parameters.any?
       rescue Aws::Errors::MissingCredentialsError
         raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
       end
-      return path_list
+      return param_list
     end
 
     # Retrieve a value for a single key (e.g. `/uc3/role/service/env/key`)
     def parameter_for_key(key)
       return key if @ssm_skip_resolution
-      @ssm_root_path.each do |root_path|
-        val = retrieve_ssm_value("#{root_path}#{key}")
+
+      if !@ssm_root_path.empty? then
+        @ssm_root_path.each do |root_path|
+          val = retrieve_ssm_value("#{root_path}#{key}")
+          return val unless val.nil?
+        end
+      else
+        val = retrieve_ssm_value(key.strip)
         return val unless val.nil?
       end
-      raise ConfigResolverError, "SSM key #{key} not found"
+      ### FAILS TESTS ### raise ConfigResolverError, "SSM key #{key} not found"
     end
 
     private
@@ -142,12 +148,14 @@ module Uc3Ssm
     end
 
     def lookup_ssm(key, defval = nil)
-      if @ssm_skip_resolution then
-        return defval unless defval.nil?
-        return key
-      end
-      @ssm_root_path.each do |root_path|
-        key = "#{root_path}#{key}"
+      return key if @ssm_skip_resolution
+
+      if !@ssm_root_path.empty? then
+        @ssm_root_path.each do |root_path|
+          val = retrieve_ssm_value("#{root_path}#{key}")
+          return val unless val.nil?
+        end
+      else
         val = retrieve_ssm_value(key.strip)
         return val unless val.nil?
       end
