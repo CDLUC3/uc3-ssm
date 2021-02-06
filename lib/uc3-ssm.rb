@@ -142,7 +142,7 @@ module Uc3Ssm
     end
 
     def lookup_ssm(key, defval = nil)
-      if @ssm_skip_resolution do
+      if @ssm_skip_resolution then
         return defval unless defval.nil?
         return key
       end
@@ -150,6 +150,7 @@ module Uc3Ssm
         key = "#{root_path}#{key}"
         val = retrieve_ssm_value(key.strip)
         return val unless val.nil?
+      end
       return defval unless defval.nil?
 
       @logger.warn "SSM key #{key} not found, no default provided"
