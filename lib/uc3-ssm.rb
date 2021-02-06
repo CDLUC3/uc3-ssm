@@ -22,6 +22,10 @@ module Uc3Ssm
     #          Not needed if AWS_REGION is configured.
     # ssm_root_path - prefix to apply to all key lookups.
     #                 This allows the same config to be used in prod and non prod envs.
+    #                 Can be a list of path strings separated by ':', in which case the
+    #                 we search for keys under each path sequentially, returning the value
+    #                 of the first matching key found.  Example:
+    #                   ssm_root_path: '/prog/srvc/subsrvc/env:/prod/srvc/subsrvc/default'
     # rubocop:disable Metrics/MethodLength
     def initialize(**options)
       dflt_regex = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
@@ -33,7 +37,7 @@ module Uc3Ssm
 
       @region = options.fetch(:region, dflt_region)
       @regex = options.fetch(:regex, dflt_regex)
-      @ssm_root_path = options.fetch(:ssm_root_path, dflt_ssm_root_path)
+      @ssm_root_path = options.fetch(:ssm_root_path, dflt_ssm_root_path).split(':')
       @def_value = options.fetch(:def_value, '')
 
       @client = Aws::SSM::Client.new(region: @region) unless @ssm_skip_resolution
@@ -70,17 +74,28 @@ module Uc3Ssm
     # See https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html for
     # details on available `options`
     def parameters_for_path(**options)
-      return [] if @ssm_skip_resolution
-      options[:path] = @ssm_root_path if options[:path].nil?
-      resp = @client.get_parameters_by_path(options)
-      !resp.nil? && resp.parameters.any? ? resp.parameters : []
-    rescue Aws::Errors::MissingCredentialsError
-      raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
+      param_list = []
+      return param_list if @ssm_skip_resolution
+
+      path_list = options[:path].nil? ? @ssm_root_path : options[:path].split
+      path_list.each do |root_path|
+        options[:path] = root_path
+        resp = @client.get_parameters_by_path(options)
+        param_list += !resp.nil? && resp.parameters.any? ? resp.parameters : []
+      rescue Aws::Errors::MissingCredentialsError
+        raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
+      end
+      return path_list
     end
 
     # Retrieve a value for a single key (e.g. `/uc3/role/service/env/key`)
     def parameter_for_key(key)
-      retrieve_ssm_value("#{@ssm_root_path}#{key}")
+      return key if @ssm_skip_resolution
+      @ssm_root_path.each do |root_path|
+        val = retrieve_ssm_value("#{root_path}#{key}")
+        return val unless val.nil?
+      end
+      raise ConfigResolverError, "SSM key #{key} not found"
     end
 
     private
@@ -127,13 +142,14 @@ module Uc3Ssm
     end
 
     def lookup_ssm(key, defval = nil)
-      key = "#{@ssm_root_path}#{key}"
-      begin
+      if @ssm_skip_resolution do
+        return defval unless defval.nil?
+        return key
+      end
+      @ssm_root_path.each do |root_path|
+        key = "#{root_path}#{key}"
         val = retrieve_ssm_value(key.strip)
         return val unless val.nil?
-      rescue
-        @logger.warn "SSM key #{key} not found"
-      end
       return defval unless defval.nil?
 
       @logger.warn "SSM key #{key} not found, no default provided"
@@ -166,8 +182,9 @@ module Uc3Ssm
 
     # Attempt to retrieve the value from AWS SSM
     def retrieve_ssm_value(key)
-      return key if @ssm_skip_resolution
       @client.get_parameter(name: key)[:parameter][:value]
+    rescue Aws::SSM::Errors::ParameterNotFound
+      return nil
     rescue Aws::Errors::MissingCredentialsError
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     rescue StandardError => e
