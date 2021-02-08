@@ -5,7 +5,6 @@ require 'aws-sdk-ssm'
 require 'logger'
 require 'yaml'
 
-
 module Uc3Ssm
   # Uc3Ssm error
   class ConfigResolverError < StandardError
@@ -13,7 +12,6 @@ module Uc3Ssm
       super("UC3 SSM Error: #{msg}")
     end
   end
-
 
   # This code is designed to mimic https://github.com/terrywbrady/yaml/blob/master/config.yml
   # rubocop:disable Metrics/ClassLength
@@ -24,7 +22,7 @@ module Uc3Ssm
     #          Not needed if AWS_REGION is configured.
     # ssm_root_path - prefix to apply to all key lookups.
     #                 This allows the same config to be used in prod and non prod envs.
-    # rubocop:disable Metrics/MethodLength
+    # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
     def initialize(**options)
       dflt_regex = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
       dflt_ssm_root_path = ENV['SSM_ROOT_PATH'] || ''
@@ -35,15 +33,14 @@ module Uc3Ssm
 
       @region = options.fetch(:region, dflt_region)
       @regex = options.fetch(:regex, dflt_regex)
-      @ssm_root_path = options.fetch(:ssm_root_path, dflt_ssm_root_path)
+      @ssm_root_path = sanitize_root_path(options.fetch(:ssm_root_path, dflt_ssm_root_path))
       @def_value = options.fetch(:def_value, '')
 
       @client = Aws::SSM::Client.new(region: @region) unless @ssm_skip_resolution
     rescue Aws::Errors::MissingRegionError
       raise ConfigResolverError, 'No AWS region defined. Either set ENV["AWS_REGION"] or pass in `region: [region]`'
     end
-    # rubocop:enable Metrics/MethodLength
-
+    # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
     # file - config file to process
     # resolve_key - partially process config file using this as a root key - use this to prevent unnecessary lookups
@@ -55,7 +52,6 @@ module Uc3Ssm
       config = YAML.load_file(file)
       resolve_hash_values(hash: config, resolve_key: resolve_key, return_key: return_key)
     end
-
 
     # hash - config hash file to process
     # resolve_key - partially process config file using this as a root key - use this to prevent unnecessary lookups
@@ -70,12 +66,12 @@ module Uc3Ssm
       return_hash(rethash, return_key)
     end
 
-
     # Retrieve all key+values for a path (using the ssm_root_path if none is specified)
     # See https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html for
     # details on available `options`
     def parameters_for_path(**options)
       return [] if @ssm_skip_resolution
+
       options[:path] = @ssm_root_path if options[:path].nil?
       resp = @client.get_parameters_by_path(options)
       !resp.nil? && resp.parameters.any? ? resp.parameters : []
@@ -83,14 +79,19 @@ module Uc3Ssm
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     end
 
-    
     # Retrieve a value for a single key (e.g. `/uc3/role/service/env/key`)
     def parameter_for_key(key)
       retrieve_ssm_value("#{@ssm_root_path}#{key}")
     end
 
-
     private
+
+    # Ensure root_path starts and ends with '/'
+    def sanitize_root_path(root_path)
+      raise ConfigResolverError, 'ssm_root_path must start with backslash' unless root_path.start_with?('/')
+
+      root_path.end_with?('/') ? root_path : root_path + '/'
+    end
 
     def return_hash(hash, return_key = nil)
       return hash unless return_key
@@ -98,7 +99,6 @@ module Uc3Ssm
 
       hash[return_key]
     end
-
 
     # Walk the Hash object examining every value
     # Treat values containing {!ENV: key} or {!SSM: path} as special
@@ -110,7 +110,6 @@ module Uc3Ssm
       obj
     end
 
-
     # Process each item in the array
     def resolve_array(obj)
       return [] if obj.nil?
@@ -118,14 +117,12 @@ module Uc3Ssm
       obj.map { |item| resolve_value(item) }
     end
 
-
     # Traverse each item in the hash
     def resolve_hash(obj)
       return {} if obj.nil?
 
       obj.map { |k, v| [k, resolve_value(v)] }.to_h
     end
-
 
     # Retrieve value for the string
     # rubocop:disable Metrics/AbcSize, Metrics/PerceivedComplexity, Metrics/MethodLength
@@ -149,7 +146,6 @@ module Uc3Ssm
     end
     # rubocop:enable Metrics/AbcSize, Metrics/PerceivedComplexity, Metrics/MethodLength
 
-
     def lookup_env(key, defval = nil)
       return ENV[key] if ENV.key?(key)
       return defval unless defval.nil?
@@ -160,13 +156,13 @@ module Uc3Ssm
       raise ConfigResolverError, "Environment variable #{key} not found, no default provided"
     end
 
-
+    # rubocop:disable Metrics/MethodLength
     def lookup_ssm(key, defval = nil)
       key = "#{@ssm_root_path}#{key}"
       begin
         val = retrieve_ssm_value(key.strip)
         return val unless val.nil?
-      rescue
+      rescue ConfigResolverError
         @logger.warn "SSM key #{key} not found"
       end
       return defval unless defval.nil?
@@ -176,19 +172,18 @@ module Uc3Ssm
 
       raise ConfigResolverError, "SSM key #{key} not found, no default provided"
     end
-
+    # rubocop:enable Metrics/MethodLength
 
     # Attempt to retrieve the value from AWS SSM
     def retrieve_ssm_value(key)
       return key if @ssm_skip_resolution
+
       @client.get_parameter(name: key)[:parameter][:value]
     rescue Aws::Errors::MissingCredentialsError
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     rescue StandardError => e
       raise ConfigResolverError, "Cannot read SSM parameter #{key} - #{e.message}"
     end
-
-
   end
   # rubocop:enable Metrics/ClassLength
 end
