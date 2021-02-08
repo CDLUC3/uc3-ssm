@@ -5,6 +5,7 @@ require 'aws-sdk-ssm'
 require 'logger'
 require 'yaml'
 
+
 module Uc3Ssm
   # Uc3Ssm error
   class ConfigResolverError < StandardError
@@ -12,6 +13,7 @@ module Uc3Ssm
       super("UC3 SSM Error: #{msg}")
     end
   end
+
 
   # This code is designed to mimic https://github.com/terrywbrady/yaml/blob/master/config.yml
   # rubocop:disable Metrics/ClassLength
@@ -42,6 +44,7 @@ module Uc3Ssm
     end
     # rubocop:enable Metrics/MethodLength
 
+
     # file - config file to process
     # resolve_key - partially process config file using this as a root key - use this to prevent unnecessary lookups
     # return_key - return values for a specific hash key - use this to filter the return object
@@ -52,6 +55,7 @@ module Uc3Ssm
       config = YAML.load_file(file)
       resolve_hash_values(hash: config, resolve_key: resolve_key, return_key: return_key)
     end
+
 
     # hash - config hash file to process
     # resolve_key - partially process config file using this as a root key - use this to prevent unnecessary lookups
@@ -66,6 +70,7 @@ module Uc3Ssm
       return_hash(rethash, return_key)
     end
 
+
     # Retrieve all key+values for a path (using the ssm_root_path if none is specified)
     # See https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html for
     # details on available `options`
@@ -78,10 +83,12 @@ module Uc3Ssm
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     end
 
+    
     # Retrieve a value for a single key (e.g. `/uc3/role/service/env/key`)
     def parameter_for_key(key)
       retrieve_ssm_value("#{@ssm_root_path}#{key}")
     end
+
 
     private
 
@@ -91,6 +98,7 @@ module Uc3Ssm
 
       hash[return_key]
     end
+
 
     # Walk the Hash object examining every value
     # Treat values containing {!ENV: key} or {!SSM: path} as special
@@ -102,12 +110,14 @@ module Uc3Ssm
       obj
     end
 
+
     # Process each item in the array
     def resolve_array(obj)
       return [] if obj.nil?
 
       obj.map { |item| resolve_value(item) }
     end
+
 
     # Traverse each item in the hash
     def resolve_hash(obj)
@@ -116,31 +126,6 @@ module Uc3Ssm
       obj.map { |k, v| [k, resolve_value(v)] }.to_h
     end
 
-    def lookup_env(key, defval = nil)
-      return ENV[key] if ENV.key?(key)
-      return defval unless defval.nil?
-
-      @logger.warn "Environment variable #{key} not found, no default provided"
-      return @def_value unless @def_value.nil? || @def_value.strip == ''
-
-      raise ConfigResolverError, "Environment variable #{key} not found, no default provided"
-    end
-
-    def lookup_ssm(key, defval = nil)
-      key = "#{@ssm_root_path}#{key}"
-      begin
-        val = retrieve_ssm_value(key.strip)
-        return val unless val.nil?
-      rescue
-        @logger.warn "SSM key #{key} not found"
-      end
-      return defval unless defval.nil?
-
-      @logger.warn "SSM key #{key} not found, no default provided"
-      return @def_value unless @def_value.nil? || @def_value.strip == ''
-
-      raise ConfigResolverError, "SSM key #{key} not found, no default provided"
-    end
 
     # Retrieve value for the string
     # rubocop:disable Metrics/AbcSize, Metrics/PerceivedComplexity, Metrics/MethodLength
@@ -164,6 +149,35 @@ module Uc3Ssm
     end
     # rubocop:enable Metrics/AbcSize, Metrics/PerceivedComplexity, Metrics/MethodLength
 
+
+    def lookup_env(key, defval = nil)
+      return ENV[key] if ENV.key?(key)
+      return defval unless defval.nil?
+
+      @logger.warn "Environment variable #{key} not found, no default provided"
+      return @def_value unless @def_value.nil? || @def_value.strip == ''
+
+      raise ConfigResolverError, "Environment variable #{key} not found, no default provided"
+    end
+
+
+    def lookup_ssm(key, defval = nil)
+      key = "#{@ssm_root_path}#{key}"
+      begin
+        val = retrieve_ssm_value(key.strip)
+        return val unless val.nil?
+      rescue
+        @logger.warn "SSM key #{key} not found"
+      end
+      return defval unless defval.nil?
+
+      @logger.warn "SSM key #{key} not found, no default provided"
+      return @def_value unless @def_value.nil? || @def_value.strip == ''
+
+      raise ConfigResolverError, "SSM key #{key} not found, no default provided"
+    end
+
+
     # Attempt to retrieve the value from AWS SSM
     def retrieve_ssm_value(key)
       return key if @ssm_skip_resolution
@@ -173,6 +187,8 @@ module Uc3Ssm
     rescue StandardError => e
       raise ConfigResolverError, "Cannot read SSM parameter #{key} - #{e.message}"
     end
+
+
   end
   # rubocop:enable Metrics/ClassLength
 end
