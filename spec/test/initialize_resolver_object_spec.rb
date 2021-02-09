@@ -5,6 +5,7 @@ require 'aws-sdk-ssm'
 
 # rubocop:disable Metrics/BlockLength
 RSpec.describe 'initialize_resolver_object_tests', type: :feature do
+
   context 'new instance creation' do
     describe 'ConfigResolver.new with no options' do
       myResolver = Uc3Ssm::ConfigResolver.new

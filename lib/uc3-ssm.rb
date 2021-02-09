@@ -79,9 +79,10 @@ module Uc3Ssm
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     end
 
-    # Retrieve a value for a single key (e.g. `/uc3/role/service/env/key`)
+    # Retrieve a value for a single key
     def parameter_for_key(key)
-      retrieve_ssm_value("#{@ssm_root_path}#{key}")
+      key = sanitize_parameter_key(key)
+      retrieve_ssm_value(key)
     end
 
     private
@@ -90,7 +91,7 @@ module Uc3Ssm
     def sanitize_root_path(root_path)
       return root_path if root_path.empty?
 
-      raise ConfigResolverError, 'ssm_root_path must start with backslash' unless root_path.start_with?('/')
+      raise ConfigResolverError, 'ssm_root_path must start with forward slash' unless root_path.start_with?('/')
 
       root_path.end_with?('/') ? root_path : root_path + '/'
     end
@@ -160,9 +161,9 @@ module Uc3Ssm
 
     # rubocop:disable Metrics/MethodLength
     def lookup_ssm(key, defval = nil)
-      key = "#{@ssm_root_path}#{key}"
+      key = sanitize_parameter_key(key)
       begin
-        val = retrieve_ssm_value(key.strip)
+        val = retrieve_ssm_value(key)
         return val unless val.nil?
       rescue ConfigResolverError
         @logger.warn "SSM key #{key} not found"
@@ -175,6 +176,17 @@ module Uc3Ssm
       raise ConfigResolverError, "SSM key #{key} not found, no default provided"
     end
     # rubocop:enable Metrics/MethodLength
+
+    # Prepend ssm_root_path to `key` to make fully qualified parameter name
+    def sanitize_parameter_key(key)
+      key_missing_msg = 'SSM paramter name not valid.  Must be a non-empty string.'
+      raise ConfigResolverError, key_missing_msg.to_s if key.nil? || key.empty?
+
+      key_not_qualified_msg = 'SSM parameter name is not fully qualified and no ssm_root_path defined.'
+      raise ConfigResolverError, key_not_qualified_msg.to_s if !key.start_with?('/') && @ssm_root_path.empty?
+
+      "#{@ssm_root_path}#{key}".strip
+    end
 
     # Attempt to retrieve the value from AWS SSM
     def retrieve_ssm_value(key)

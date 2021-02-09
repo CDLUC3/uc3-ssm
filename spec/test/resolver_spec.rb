@@ -16,6 +16,8 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
   end
 
   before(:each) do
+    ENV.delete('SSM_ROOT_PATH')
+    ENV.delete('SSM_SMIP_RESOLUTION')
     @resolver = Uc3Ssm::ConfigResolver.new
     @resolver_def = Uc3Ssm::ConfigResolver.new(def_value: 'NOT_APPLICABLE')
     @resolver_prefix = Uc3Ssm::ConfigResolver.new(
@@ -82,13 +84,18 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     end
 
     describe '#parameter_for_key(key)' do
-      it 'calls retrieve_ssm_value' do
+      it 'calls retrieve_ssm_value with fully qualified key' do
         allow(@resolver).to receive(:retrieve_ssm_value).at_least(1)
-        @resolver.parameter_for_key('key')
+        @resolver.parameter_for_key('/key')
       end
-      it 'appends the ssm_root_path to the key' do
+      it 'prepends the ssm_root_path to the key' do
         allow(@resolver_prefix).to receive(:retrieve_ssm_value).with('/root/path/key').at_least(1)
         @resolver_prefix.parameter_for_key('key')
+      end
+      it 'raises an error no root path and non-fully qualified key' do
+        expect do
+          @resolver.send(:parameter_for_key, 'key')
+        end.to raise_exception(Uc3Ssm::ConfigResolverError)
       end
     end
   end
@@ -136,24 +143,24 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
 
     describe '#lookup_ssm(key, defval)' do
       it 'returns the SSM value' do
-        allow(@resolver).to receive(:retrieve_ssm_value).with('foo').and_return('bar')
-        expect(@resolver.send(:lookup_ssm, 'foo')).to eql('bar')
+        allow(@resolver).to receive(:retrieve_ssm_value).with('/foo').and_return('bar')
+        expect(@resolver.send(:lookup_ssm, '/foo')).to eql('bar')
       end
       it 'returns the default value if no ENV is found' do
-        allow(@resolver).to receive(:retrieve_ssm_value).with('foo').and_return(nil)
-        expect(@resolver.send(:lookup_ssm, 'foo', 'dflt')).to eql('dflt')
+        allow(@resolver).to receive(:retrieve_ssm_value).with('/foo').and_return(nil)
+        expect(@resolver.send(:lookup_ssm, '/foo', 'dflt')).to eql('dflt')
       end
       it 'returns the global default value if no ENV or default is found' do
         resolver = Uc3Ssm::ConfigResolver.new(def_value: 'instance dflt')
-        allow(resolver).to receive(:retrieve_ssm_value).with('foo').and_return(nil)
-        expect(resolver.send(:lookup_ssm, 'foo')).to eql('instance dflt')
+        allow(resolver).to receive(:retrieve_ssm_value).with('/foo').and_return(nil)
+        expect(resolver.send(:lookup_ssm, '/foo')).to eql('instance dflt')
       end
       it 'throws an error if no value can be found and no defaults are defined' do
         expect do
           resolver = Uc3Ssm::ConfigResolver.new
-          allow(resolver).to receive(:retrieve_ssm_value).with('foo').and_return(nil)
-          resolver.send(:lookup_ssm, 'foo')
-        end.to raise_exception('UC3 SSM Error: SSM key foo not found, no default provided')
+          allow(resolver).to receive(:retrieve_ssm_value).with('/foo').and_return(nil)
+          resolver.send(:lookup_ssm, '/foo')
+        end.to raise_exception('UC3 SSM Error: SSM key /foo not found, no default provided')
       end
     end
 
@@ -251,9 +258,9 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
   it 'Test Default Value' do
     config_in = basic_hash
     config_in[:a] = '{!ENV: TESTUC3_SSM_ENV1 !DEFAULT: def}'
-    config_in[:b][0] = '{!SSM: TESTUC3_SSM2 !DEFAULT: def2}'
+    config_in[:b][0] = '{!SSM: /root/path/TESTUC3_SSM2 !DEFAULT: def2}'
     mock_ssm('TESTUC3_SSM_ENV1', 'def')
-    mock_ssm('TESTUC3_SSM2', 'def2')
+    mock_ssm('/root/path/TESTUC3_SSM2', 'def2')
     config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('def')
     expect(config[:b][0]).to eq('def2')
@@ -278,17 +285,17 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
 
   it 'Test No Default SSM Value' do
     config_in = basic_hash
-    config_in[:b][0] = '{!SSM: TESTUC3_SSM2}'
-    allow(@resolver).to receive(:retrieve_ssm_value).with('TESTUC3_SSM2').and_return(nil)
+    config_in[:b][0] = '{!SSM: /TESTUC3_SSM2}'
+    allow(@resolver).to receive(:retrieve_ssm_value).with('/TESTUC3_SSM2').and_return(nil)
     expect do
       @resolver.resolve_hash_values(hash: config_in)
-    end.to raise_exception('UC3 SSM Error: SSM key TESTUC3_SSM2 not found, no default provided')
+    end.to raise_exception('UC3 SSM Error: SSM key /TESTUC3_SSM2 not found, no default provided')
   end
 
   it 'Test No Default SSM Value - Global Default' do
     config_in = basic_hash
-    config_in[:b][0] = '{!SSM: TESTUC3_SSM2}'
-    allow(@resolver_def).to receive(:retrieve_ssm_value).with('TESTUC3_SSM2').and_return(nil)
+    config_in[:b][0] = '{!SSM: /TESTUC3_SSM2}'
+    allow(@resolver_def).to receive(:retrieve_ssm_value).with('/TESTUC3_SSM2').and_return(nil)
     config = @resolver_def.resolve_hash_values(hash: config_in)
     expect(config[:b][0]).to eq('NOT_APPLICABLE')
   end
@@ -422,8 +429,8 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
 
   it 'Test SSM substitution' do
     config_in = basic_hash
-    mock_ssm('TESTUC3_SSM1', '100')
-    config_in[:a] = '{!SSM: TESTUC3_SSM1 !DEFAULT: def}'
+    mock_ssm('/TESTUC3_SSM1', '100')
+    config_in[:a] = '{!SSM: /TESTUC3_SSM1 !DEFAULT: def}'
     config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('100')
     expect(config[:b][0]).to eq('hi')
@@ -444,8 +451,8 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
 
   it 'Test SSM substitution - no default' do
     config_in = basic_hash
-    mock_ssm('TESTUC3_SSM1', '100')
-    config_in[:a] = '{!SSM: TESTUC3_SSM1}'
+    mock_ssm('/TESTUC3_SSM1', '100')
+    config_in[:a] = '{!SSM: /TESTUC3_SSM1}'
     config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('100')
     expect(config[:b][0]).to eq('hi')
@@ -455,9 +462,9 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
 
   it 'Test Compound SSM substitution' do
     config_in = basic_hash
-    mock_ssm('TESTUC3_SSM1', 'path/')
-    mock_ssm('TESTUC3_SSM2', 'subpath')
-    config_in[:a] = 'AA/{!SSM: TESTUC3_SSM1 !DEFAULT: def}{!SSM: TESTUC3_SSM2 !DEFAULT: def2}/bb.txt'
+    mock_ssm('/TESTUC3_SSM1', 'path')
+    mock_ssm('/TESTUC3_SSM2', 'subpath')
+    config_in[:a] = 'AA/{!SSM: /TESTUC3_SSM1 !DEFAULT: def}/{!SSM: /TESTUC3_SSM2 !DEFAULT: def2}/bb.txt'
     config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('AA/path/subpath/bb.txt')
     expect(config[:b][0]).to eq('hi')
@@ -467,9 +474,9 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
 
   it 'Test Compound SSM/ENV substitution' do
     config_in = basic_hash
-    mock_ssm('TESTUC3_SSM1', 'path/')
+    mock_ssm('/TESTUC3_SSM1', 'path')
     ENV['TESTUC3_SSM_ENV2'] = 'envpath'
-    config_in[:a] = 'AA/{!SSM: TESTUC3_SSM1 !DEFAULT: def}{!ENV: TESTUC3_SSM_ENV2 !DEFAULT: def2}/bb.txt'
+    config_in[:a] = 'AA/{!SSM: /TESTUC3_SSM1 !DEFAULT: def}/{!ENV: TESTUC3_SSM_ENV2 !DEFAULT: def2}/bb.txt'
     config = @resolver.resolve_hash_values(hash: config_in)
     expect(config[:a]).to eq('AA/path/envpath/bb.txt')
     expect(config[:b][0]).to eq('hi')
@@ -479,11 +486,11 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
 
   it 'Test Compound SSM/ENV substitution - SSM_SKIP_RESOLUTION' do
     config_in = basic_hash
-    mock_ssm('TESTUC3_SSM1', 'path/')
+    mock_ssm('/TESTUC3_SSM1', 'path')
     ENV['TESTUC3_SSM_ENV2'] = 'envpath'
-    config_in[:a] = 'AA/{!SSM: TESTUC3_SSM1 !DEFAULT: def}{!ENV: TESTUC3_SSM_ENV2 !DEFAULT: def2}/bb.txt'
+    config_in[:a] = 'AA/{!SSM: /TESTUC3_SSM1 !DEFAULT: def}/{!ENV: TESTUC3_SSM_ENV2 !DEFAULT: def2}/bb.txt'
     config = @resolver_skip.resolve_hash_values(hash: config_in)
-    expect(config[:a]).to eq('AA/TESTUC3_SSM1envpath/bb.txt')
+    expect(config[:a]).to eq('AA//TESTUC3_SSM1/envpath/bb.txt')
     expect(config[:b][0]).to eq('hi')
     expect(config[:c][:d]).to eq(3)
     expect(config[:c][:e][1]).to eq(2)
