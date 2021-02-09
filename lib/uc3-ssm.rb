@@ -88,6 +88,8 @@ module Uc3Ssm
 
     # Ensure root_path starts and ends with '/'
     def sanitize_root_path(root_path)
+      return root_path if root_path.empty?
+
       raise ConfigResolverError, 'ssm_root_path must start with backslash' unless root_path.start_with?('/')
 
       root_path.end_with?('/') ? root_path : root_path + '/'
