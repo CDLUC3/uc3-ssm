@@ -165,8 +165,8 @@ myResolver = Uc3Ssm::ConfigResolver.new(
   region: "us-west-2",
   def_value: "NOT_FOUND",
 )
-
 myvars = myResolver.resolve_file_values('myvars.yaml')
+
 puts myvars
 {:mySsmVar=>"blee", :myEnvVar=>"some_other_value", :myNoNetVar=>"NOT_FOUND"}
 ```
@@ -175,11 +175,16 @@ puts myvars
 
 #### `def resolve_hash_values(hash:, resolve_key: nil, return_key: nil)`
 
-- hash - config hash to process
-- resolve_key - partially process config hash using this as a root key - use this to prevent unnecessary lookups
-- return_key - return values for a specific hash key - use this to filter the return object
+Performs SSM (or ENV) parameter resolution of within a ruby hash object formatted for
+uc3-ssm lookups.
 
-This works essentially the same as `resolve_file_values`.  The difference being the input is a ruby hash instead of a yaml file
+This works essentially the same as `resolve_file_values`.  The difference being
+the input is a ruby hash instead of a yaml file.
+
+- `hash`        - config hash to process
+- `resolve_key` - partially process config hash using this as a root key - use this to prevent unnecessary lookups
+- `return_key`  - return values for a specific hash key - use this to filter the return object
+
 
 
 
