@@ -65,21 +65,34 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     end
 
     describe '#parameters_for_path(**options)' do
+      it 'throws ConfigResolverError if no ssm_root_path and path is not fully qualified' do
+        expect do
+          @resolver.parameters_for_path(path: 'badpath')
+        end.to raise_exception(Uc3Ssm::ConfigResolverError)
+      end
+      it 'searches over ssm_root_path when options[path] not specified' do
+        allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path).with(path: '/root/path/')
+        @resolver_prefix.parameters_for_path()
+      end
+      it 'prepends the ssm_root_path to options["subpath"]' do
+        allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path).with(path: '/root/path/subpath')
+        @resolver_prefix.parameters_for_path({path: 'subpath'})
+      end
       it 'throws an AWS Credentials error if SSM could not be accessed' do
         err = Aws::Errors::MissingCredentialsError.new
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path).and_raise(err)
         expect do
-          @resolver.parameters_for_path(path: 'path')
+          @resolver.parameters_for_path(path: '/path')
         end.to raise_exception(@no_ssm_error)
       end
       it 'returns an empty array if no SSM entry exists' do
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path).and_return(nil)
-        expect(@resolver.parameters_for_path(path: 'path')).to eql([])
+        expect(@resolver.parameters_for_path(path: '/path')).to eql([])
       end
       it 'returns the list of available parameters' do
         expected = OpenStruct.new(parameters: %w[a b])
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path).and_return(expected)
-        expect(@resolver.parameters_for_path(path: 'path')).to eql(%w[a b])
+        expect(@resolver.parameters_for_path(path: '/path')).to eql(%w[a b])
       end
     end
 

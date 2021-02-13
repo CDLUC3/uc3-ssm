@@ -1,3 +1,107 @@
+Rubygem uc3-ssm
+===============
+
+A library for looking up configuration parameters in AWS SSM ParameterStore.
+
+Intended for use by CDL UC3 services.  We rely on EC2 instance profiles to provide AWS credentials and SSM access policy.
+
+
+# Basic Usage - the Uc3Ssm::ConfigResolver object
+
+### Parameters
+
+- `ssm_root_path`: prefix to apply to all parameter name lookups.  This must be
+  a fully qualified parameter path, i.e. it must start with a forward slash
+  ('/').  Defaults to value of environment var `SSM_ROOT_PATH` if defined.
+
+- `region`: AWS region in which to perform the SSM lookup.  Defaults to value
+  of environment var `AWS_REGION` if defined, or failing that, to `us-west-2`. 
+
+- `def_value`: (optional) a global fallback value to return when a lookup key
+  does not match any parameter names in SSM ParameterStore and no local default
+  is defined.  This can help prevent exceptions from being thrown in your
+  applications.  Defaults to empty string ('').
+
+- `ssm_skip_resolution`: boolean flag.   When set, no SSM ParameterStore
+  lookups will occur.  Key lookups fall back to local environment lookups or to
+  defined default values.  Defaults to value of environment var
+  `SSM_SKIP_RESOLUTION` if defined.
+
+
+### Instantiation 
+
+Default instance has no `ssm_root_path`.  All lookup keys must be fully qualified.
+
+```ruby
+  require uc3-ssm
+  myDefaultResolver = Uc3Ssm::ConfigResolver.new()
+```
+
+
+Explicit parameter declaration.  All unqualified lookup keys will have the
+`ssm_root_path` prepended when passed as parameter names to SSM ParameterStore.
+
+```ruby
+  myResolver = Uc3Ssm::ConfigResolver.new(
+    ssm_root_path: "/my/root/path"
+    region: "us-west-2",
+)
+```
+
+Implicit parameter declaration using environment vars.
+
+```ruby
+  export SSM_ROOT_PATH=/my/other/root/path
+  export AWS_REGION=us-west-2
+  myResolver = Uc3Ssm::ConfigResolver.new()
+```
+
+
+### Public Instance Methods
+
+**myResolver.parameter_for_key(key)** - perform a simple lookup for a single ssm parameter.  
+
+When `key` is prefixed be a forward slash (e.g. `/cleverman` or
+`/price/tea/china`), it is considered to be a fully qualified parameter name
+and is passed 'as is' to SSM.  If not so prefixed, then `ssm_root_path` is
+prepended to `key` to form a fully qualified parameter name.
+
+NOTE: if `ssm_root_path` is not defined, and `key` is unqualified (no forward
+slash prefix), an exception is thrown.
+
+
+Example:
+
+```
+myResolver = Uc3Ssm::ConfigResolver.new(ssm_root_path: "/my/root/path")
+myResolver.parameter_for_key('/cheese/blue')
+# returns value for parameter name '/cheese/blue'
+
+myResolver.parameter_for_key('blee')
+# returns value for parameter name '/my/root/path/blee'
+
+myDefaultResolver = Uc3Ssm::ConfigResolver.new()
+myDefaultResolver.parameter_for_key('blee')
+# throws ConfigResolverError exception
+```
+
+
+**myResolver.parameters_for_path(path)** - perform a recursive lookup for all parameters prefixed by `path`.
+
+As with `myResolver.parameter_for_key(key)`, when `path` is not fully qualified, `ssm_root_path` is prepended to `path` to form a fully qualified parameter path.
+
+
+
+
+Example of directly retrieving API credentials from SSM
+```ruby
+  ssm = Uc3Ssm::ConfigResolver.new
+  client_id = ssm.parameter_for_key('client_id') || ''
+  client_secret = ssm.parameter_for_key('client_secret') || ''
+```
+
+
+
 # Resolve System Configuration with the AWS SSM Parameter Store
 
 ## Original System Configuration File
@@ -211,13 +315,6 @@ def config.database_configuration
   # The entire config must be returned, but only the Rails.env will be processed
   load_uc3_config({ name: 'database.yml', resolve_key: Rails.env })
 end
-```
-
-Example of directly retrieving API credentials from SSM
-```ruby
-  ssm = Uc3Ssm::ConfigResolver.new
-  client_id = ssm.parameter_for_key('client_id') || ''
-  client_secret = ssm.parameter_for_key('client_secret') || ''
 ```
 
 ### Installation - Ruby Lambda

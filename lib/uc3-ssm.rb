@@ -72,7 +72,7 @@ module Uc3Ssm
     def parameters_for_path(**options)
       return [] if @ssm_skip_resolution
 
-      options[:path] = @ssm_root_path if options[:path].nil?
+      options[:path] = options[:path].nil? ? @ssm_root_path : sanitize_parameter_key(options[:path])
       resp = @client.get_parameters_by_path(options)
       !resp.nil? && resp.parameters.any? ? resp.parameters : []
     rescue Aws::Errors::MissingCredentialsError
