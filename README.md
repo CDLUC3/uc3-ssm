@@ -6,7 +6,7 @@ A library for looking up configuration parameters in AWS SSM ParameterStore.
 Intended for use by CDL UC3 services.  We rely on EC2 instance profiles to provide AWS credentials and SSM access policy.
 
 
-# Basic Usage - the Uc3Ssm::ConfigResolver object
+## Basic Usage - the Uc3Ssm::ConfigResolver object
 
 ### Parameters
 
@@ -33,8 +33,8 @@ Intended for use by CDL UC3 services.  We rely on EC2 instance profiles to provi
 Default instance has no `ssm_root_path`.  All lookup keys must be fully qualified.
 
 ```ruby
-  require uc3-ssm
-  myDefaultResolver = Uc3Ssm::ConfigResolver.new()
+require uc3-ssm
+myDefaultResolver = Uc3Ssm::ConfigResolver.new()
 ```
 
 
@@ -42,24 +42,25 @@ Explicit parameter declaration.  All unqualified lookup keys will have the
 `ssm_root_path` prepended when passed as parameter names to SSM ParameterStore.
 
 ```ruby
-  myResolver = Uc3Ssm::ConfigResolver.new(
-    ssm_root_path: "/my/root/path"
-    region: "us-west-2",
+myResolver = Uc3Ssm::ConfigResolver.new(
+  ssm_root_path: "/my/root/path"
+  region: "us-west-2",
 )
 ```
 
 Implicit parameter declaration using environment vars.
 
 ```ruby
-  export SSM_ROOT_PATH=/my/other/root/path
-  export AWS_REGION=us-west-2
-  myResolver = Uc3Ssm::ConfigResolver.new()
+ENV['SSM_ROOT_PATH'] = '/my/other/root/path'
+ENV['AWS_REGION'] = 'us-west-2'
+myResolver = Uc3Ssm::ConfigResolver.new()
 ```
 
 
 ### Public Instance Methods
 
-**myResolver.parameter_for_key(key)** - perform a simple lookup for a single ssm parameter.  
+`**myResolver.parameter_for_key(key)**` - perform a simple lookup for a single
+                                          ssm parameter.  
 
 When `key` is prefixed be a forward slash (e.g. `/cleverman` or
 `/price/tea/china`), it is considered to be a fully qualified parameter name
@@ -72,7 +73,7 @@ slash prefix), an exception is thrown.
 
 Example:
 
-```
+```ruby
 myResolver = Uc3Ssm::ConfigResolver.new(ssm_root_path: "/my/root/path")
 myResolver.parameter_for_key('/cheese/blue')
 # returns value for parameter name '/cheese/blue'
@@ -85,20 +86,39 @@ myDefaultResolver.parameter_for_key('blee')
 # throws ConfigResolverError exception
 ```
 
-
-**myResolver.parameters_for_path(path)** - perform a recursive lookup for all parameters prefixed by `path`.
-
-As with `myResolver.parameter_for_key(key)`, when `path` is not fully qualified, `ssm_root_path` is prepended to `path` to form a fully qualified parameter path.
-
-
-
-
 Example of directly retrieving API credentials from SSM
+
 ```ruby
-  ssm = Uc3Ssm::ConfigResolver.new
-  client_id = ssm.parameter_for_key('client_id') || ''
-  client_secret = ssm.parameter_for_key('client_secret') || ''
+ENV['SSM_ROOT_PATH'] = '/my/path/'
+ssm = Uc3Ssm::ConfigResolver.new
+client_id = ssm.parameter_for_key('client_id') || ''
+client_secret = ssm.parameter_for_key('client_secret') || ''
 ```
+
+
+TODO:  this is not acurate
+
+**myResolver.parameters_for_path(**options)** - perform a recursive lookup for all
+                                               parameters prefixed by `options['path']`.
+
+As with `myResolver.parameter_for_key(key)`, when `path` is not fully
+qualified, `ssm_root_path` is prepended to `path` to form a fully qualified
+parameter path.
+
+Example:
+
+```ruby
+myResolver = Uc3Ssm::ConfigResolver.new(ssm_root_path: "/my/base/path")
+myResolver.parameter_for_key(path: 'args')
+# returns values for all parameter names starting with "/my/base/path/args"
+```
+
+TODO: need docs for
+
+- resolve_file_values
+- resolve_hash_values
+
+
 
 
 
