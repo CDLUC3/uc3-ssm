@@ -53,8 +53,8 @@ module Uc3Ssm
       resolve_hash_values(hash: config, resolve_key: resolve_key, return_key: return_key)
     end
 
-    # hash - config hash file to process
-    # resolve_key - partially process config file using this as a root key - use this to prevent unnecessary lookups
+    # hash - config hash to process
+    # resolve_key - partially process config hash using this as a root key - use this to prevent unnecessary lookups
     # return_key - return values for a specific hash key - use this to filter the return object
     def resolve_hash_values(hash:, resolve_key: nil, return_key: nil)
       if resolve_key && hash.key?(resolve_key)
@@ -67,7 +67,7 @@ module Uc3Ssm
     end
 
     # Retrieve all key+values for a path (using the ssm_root_path if none is specified)
-    # See https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html for
+    # See https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html#get_parameters_by_path-instance_method
     # details on available `options`
     def parameters_for_path(**options)
       return [] if @ssm_skip_resolution
