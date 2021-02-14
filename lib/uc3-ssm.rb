@@ -28,15 +28,20 @@ module Uc3Ssm
     #                   ssm_root_path: '/prog/srvc/subsrvc/env:/prod/srvc/subsrvc/default'
     # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
     def initialize(**options)
+      # see issue #9 - @regex should not be a user definable option
       dflt_regex = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
+      @regex = options.fetch(:regex, dflt_regex)
+
+      # see issue #10 - @ssm_skip_resolution only settable as ENV var
+      @ssm_skip_resolution = ENV.key?('SSM_SKIP_RESOLUTION')
+      #dflt_ssm_skip_resolution = ENV['SSM_SKIP_RESOLUTION'] || false
+      #@ssm_skip_resolution = options.fetch(:ssm_skip_resolution, dflt_ssm_skip_resolution)
+
       dflt_region = ENV['AWS_REGION'] || 'us-west-2'
       dflt_ssm_root_path = ENV['SSM_ROOT_PATH'] || ''
-      dflt_ssm_skip_resolution = ENV['SSM_SKIP_RESOLUTION'] || false
 
-      @regex = options.fetch(:regex, dflt_regex)
       @region = options.fetch(:region, dflt_region)
       @ssm_root_path = sanitize_root_path(options.fetch(:ssm_root_path, dflt_ssm_root_path))
-      @ssm_skip_resolution = options.fetch(:ssm_skip_resolution, dflt_ssm_skip_resolution)
       @def_value = options.fetch(:def_value, '')
       @logger = options.fetch(:logger, Logger.new(STDOUT))
       @client = Aws::SSM::Client.new(region: @region) unless @ssm_skip_resolution

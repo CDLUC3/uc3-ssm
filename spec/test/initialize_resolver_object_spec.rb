@@ -31,6 +31,7 @@ RSpec.describe 'Test resolver object initialization. ', type: :feature do
         region: 'us-east-1',
         ssm_root_path: '/root/path/',
         def_value: 'NOT_APPLICABLE',
+        # see issue #10 - @ssm_skip_resolution only settable as ENV var
         ssm_skip_resolution: true
       )
       it 'sets @region.' do
@@ -42,12 +43,10 @@ RSpec.describe 'Test resolver object initialization. ', type: :feature do
       it 'sets @def_value.' do
         expect(myResolver.instance_variable_get(:@def_value)).to eq('NOT_APPLICABLE')
       end
-      it 'sets @ssm_skip_resolution to true.' do
-        expect(myResolver.instance_variable_get(:@ssm_skip_resolution)).to be true
-      end
-      it 'does not set @client because @ssm_skip_resolution is true.' do
-        expect(myResolver.instance_variable_get(:@client)).to be nil
-      end
+      # see issue #10 - @ssm_skip_resolution only settable as ENV var
+      #it 'sets @ssm_skip_resolution to true.' do
+      #  expect(myResolver.instance_variable_get(:@ssm_skip_resolution)).to be true
+      #end
     end
 
     describe 'where ssm_root_path is list of colon separated paths' do
@@ -83,6 +82,9 @@ RSpec.describe 'Test resolver object initialization. ', type: :feature do
       end
       it 'sets @ssm_skip_resolution.' do
         expect(myResolver.instance_variable_get(:@ssm_skip_resolution)).to be true
+      end
+      it 'does not set @client because @ssm_skip_resolution is true.' do
+        expect(myResolver.instance_variable_get(:@client)).to be nil
       end
     end
   end
