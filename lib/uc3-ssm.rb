@@ -29,17 +29,16 @@ module Uc3Ssm
     # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
     def initialize(**options)
       dflt_regex = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
-      dflt_ssm_root_path = ENV['SSM_ROOT_PATH'] || ''
       dflt_region = ENV['AWS_REGION'] || 'us-west-2'
-      @ssm_skip_resolution = ENV.key?('SSM_SKIP_RESOLUTION')
+      dflt_ssm_root_path = ENV['SSM_ROOT_PATH'] || ''
+      dflt_ssm_skip_resolution = ENV['SSM_SKIP_RESOLUTION'] || false
 
-      @logger = options.fetch(:logger, Logger.new(STDOUT))
-
-      @region = options.fetch(:region, dflt_region)
       @regex = options.fetch(:regex, dflt_regex)
+      @region = options.fetch(:region, dflt_region)
       @ssm_root_path = sanitize_root_path(options.fetch(:ssm_root_path, dflt_ssm_root_path))
+      @ssm_skip_resolution = options.fetch(:ssm_skip_resolution, dflt_ssm_skip_resolution)
       @def_value = options.fetch(:def_value, '')
-
+      @logger = options.fetch(:logger, Logger.new(STDOUT))
       @client = Aws::SSM::Client.new(region: @region) unless @ssm_skip_resolution
     rescue Aws::Errors::MissingRegionError
       raise ConfigResolverError, 'No AWS region defined. Either set ENV["AWS_REGION"] or pass in `region: [region]`'
@@ -113,7 +112,7 @@ module Uc3Ssm
       root_path.split(':').each do |path|
         raise ConfigResolverError, 'ssm_root_path must start with forward slash' unless path.start_with?('/')
 
-        root_path_list << path.end_with?('/') ? path : path + '/'
+        root_path_list.push(path.end_with?('/') ? path : path + '/')
       end
       root_path_list
     end
