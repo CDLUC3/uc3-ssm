@@ -73,6 +73,7 @@ module Uc3Ssm
     # Retrieve all key+values for a path (using the ssm_root_path if none is specified)
     # See https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html#get_parameters_by_path-instance_method
     # details on available `options`
+    # rubocop:disable Metrics/MethodLength
     def parameters_for_path(**options)
       return [] if @ssm_skip_resolution
 
@@ -82,19 +83,21 @@ module Uc3Ssm
         options[:path] = root_path
         resp = @client.get_parameters_by_path(options)
         param_list += resp.parameters if !resp.nil? && resp.parameters.any?
-      rescue Aws::Errors::MissingCredentialsError
-        raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
       end
-      return param_list
+
+      param_list
+    rescue Aws::Errors::MissingCredentialsError
+      raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     end
+    # rubocop:enable Metrics/MethodLength
 
     # Retrieve a value for a single key
     def parameter_for_key(key)
       return key if @ssm_skip_resolution
 
       keylist = sanitize_parameter_key(key)
-      keylist.each do |key|
-        val = retrieve_ssm_value(key)
+      keylist.each do |k|
+        val = retrieve_ssm_value(k)
         return val unless val.nil?
       end
     end
@@ -108,8 +111,9 @@ module Uc3Ssm
 
       root_path_list = []
       root_path.split(':').each do |path|
-        raise ConfigResolverError, 'ssm_root_path must start with forward slash' unless root_path.start_with?('/')
-        root_path_list += path.end_with?('/') ? path : path + '/'
+        raise ConfigResolverError, 'ssm_root_path must start with forward slash' unless path.start_with?('/')
+
+        root_path_list << path.end_with?('/') ? path : path + '/'
       end
       root_path_list
     end
@@ -177,13 +181,12 @@ module Uc3Ssm
       raise ConfigResolverError, "Environment variable #{key} not found, no default provided"
     end
 
-    # rubocop:disable Metrics/MethodLength
     def lookup_ssm(key, defval = nil)
       return key if @ssm_skip_resolution
 
       keylist = sanitize_parameter_key(key)
-      keylist.each do |key|
-        val = retrieve_ssm_value(key)
+      keylist.each do |k|
+        val = retrieve_ssm_value(k)
         return val unless val.nil?
       end
       return defval unless defval.nil?
@@ -193,7 +196,6 @@ module Uc3Ssm
 
       raise ConfigResolverError, "SSM key #{key} not found, no default provided"
     end
-    # rubocop:enable Metrics/MethodLength
 
     # Return an array of fully qualified parameter names. For each root_path in
     # @ssm_root_path prepend root_path to `key` to make fully qualified
@@ -209,7 +211,8 @@ module Uc3Ssm
       @ssm_root_path.each do |root_path|
         keylist += "#{root_path}#{key}"
       end
-      return keylist
+
+      keylist
     end
 
     # Attempt to retrieve the value from AWS SSM
@@ -218,7 +221,7 @@ module Uc3Ssm
 
       @client.get_parameter(name: key)[:parameter][:value]
     rescue Aws::SSM::Errors::ParameterNotFound
-      return nil
+      nil
     rescue Aws::Errors::MissingCredentialsError
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     rescue StandardError => e
