@@ -208,12 +208,14 @@ module Uc3Ssm
       key_missing_msg = 'SSM paramter name not valid.  Must be a non-empty string.'
       raise ConfigResolverError, key_missing_msg.to_s if key.nil? || key.empty?
 
+      return [key] if key.start_with?('/')
+
       key_not_qualified_msg = 'SSM parameter name is not fully qualified and no ssm_root_path defined.'
-      raise ConfigResolverError, key_not_qualified_msg.to_s if !key.start_with?('/') && @ssm_root_path.empty?
+      raise ConfigResolverError, key_not_qualified_msg.to_s if @ssm_root_path.empty?
 
       keylist = []
       @ssm_root_path.each do |root_path|
-        keylist += "#{root_path}#{key}"
+        keylist.push("#{root_path}#{key}")
       end
 
       keylist
