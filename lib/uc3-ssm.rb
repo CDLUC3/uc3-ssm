@@ -34,8 +34,8 @@ module Uc3Ssm
 
       # see issue #10 - @ssm_skip_resolution only settable as ENV var
       @ssm_skip_resolution = ENV.key?('SSM_SKIP_RESOLUTION')
-      #dflt_ssm_skip_resolution = ENV['SSM_SKIP_RESOLUTION'] || false
-      #@ssm_skip_resolution = options.fetch(:ssm_skip_resolution, dflt_ssm_skip_resolution)
+      # dflt_ssm_skip_resolution = ENV['SSM_SKIP_RESOLUTION'] || false
+      # @ssm_skip_resolution = options.fetch(:ssm_skip_resolution, dflt_ssm_skip_resolution)
 
       dflt_region = ENV['AWS_REGION'] || 'us-west-2'
       dflt_ssm_root_path = ENV['SSM_ROOT_PATH'] || ''
@@ -77,23 +77,28 @@ module Uc3Ssm
     # Retrieve all key+values for a path (using the ssm_root_path if none is specified)
     # See https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html#get_parameters_by_path-instance_method
     # details on available `options`
-    # rubocop:disable Metrics/MethodLength
+    # rubocop:disable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity
     def parameters_for_path(**options)
       return [] if @ssm_skip_resolution
 
       param_list = []
       path_list = options[:path].nil? ? @ssm_root_path : sanitize_parameter_key(options[:path])
       path_list.each do |root_path|
-        options[:path] = root_path
-        resp = @client.get_parameters_by_path(options)
-        param_list += resp.parameters if !resp.nil? && resp.parameters.any?
+        begin
+          options[:path] = root_path
+          resp = @client.get_parameters_by_path(options)
+          param_list += resp.parameters if !resp.nil? && resp.parameters.any?
+        rescue Aws::SSM::Errors::ParameterNotFound
+          @logger.debug "ParameterNotFound for path '#{root_path}' in parameters_by_path"
+          next
+        end
       end
 
       param_list
     rescue Aws::Errors::MissingCredentialsError
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     end
-    # rubocop:enable Metrics/MethodLength
+    # rubocop:enable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity
 
     # Retrieve a value for a single key
     def parameter_for_key(key)
@@ -227,6 +232,7 @@ module Uc3Ssm
 
       @client.get_parameter(name: key)[:parameter][:value]
     rescue Aws::SSM::Errors::ParameterNotFound
+      @logger.debug "ParameterNotFound for key '#{key}' in retrieve_ssm_value"
       nil
     rescue Aws::Errors::MissingCredentialsError
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'

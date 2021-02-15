@@ -25,6 +25,9 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
       region: 'us-west-2',
       ssm_root_path: '/root/path/'
     )
+    @resolver_prefix_list = Uc3Ssm::ConfigResolver.new(
+      ssm_root_path: '/root/path/:/other/path'
+    )
     ENV['SSM_SKIP_RESOLUTION'] = 'Y'
     @resolver_skip = Uc3Ssm::ConfigResolver.new
     ENV.delete('SSM_SKIP_RESOLUTION')
@@ -53,6 +56,12 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
                                                                       .and_raise(err)
   end
 
+  def mock_ssm_not_found(name)
+    allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameter)
+        .with({ name: name })
+        .and_raise(Aws::SSM::Errors::ParameterNotFound.new({}, name))
+  end
+
   after(:each) do
     ENV.delete('TESTUC3_SSM_ENV1')
     ENV.delete('TESTUC3_SSM_ENV2')
@@ -68,7 +77,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
       it 'throws ConfigResolverError if no ssm_root_path and path is not fully qualified' do
         expect do
           @resolver.parameters_for_path(path: 'badpath')
-        end.to raise_exception(Uc3Ssm::ConfigResolverError)
+        end.to raise_exception(Uc3Ssm::ConfigResolverError) 
       end
       it 'searches over ssm_root_path when options[path] not specified' do
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path).with(path: '/root/path/')
@@ -94,6 +103,25 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path).and_return(expected)
         expect(@resolver.parameters_for_path(path: '/path')).to eql(%w[a b])
       end
+      it 'searches over a list of root_paths when ssm_root_path is colon separated list' do
+        resp1 = OpenStruct.new(parameters: %w[a b])
+        resp2 = OpenStruct.new(parameters: %w[c d])
+        allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path)
+            .with(path: '/root/path/foo').and_return(resp1)
+        allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path)
+            .with(path: '/other/path/foo').and_return(resp2)
+        expect(@resolver_prefix_list.parameters_for_path(path: 'foo')).to eql(%w[a b c d])
+      end
+      it 'only returns params for second root_paths when first root_path does not contain key' do
+        resp1 = OpenStruct.new(parameters: %w[a b])
+        resp2 = OpenStruct.new(parameters: %w[c d])
+        allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path)
+            .with(path: '/root/path/foo')
+            .and_raise(Aws::SSM::Errors::ParameterNotFound.new({}, '/root/path/foo'))
+        allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path)
+            .with(path: '/other/path/foo').and_return(resp2)
+        expect(@resolver_prefix_list.parameters_for_path(path: 'foo')).to eql(%w[c d])
+      end
     end
 
     describe '#parameter_for_key(key)' do
@@ -109,6 +137,16 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
         expect do
           @resolver.send(:parameter_for_key, 'key')
         end.to raise_exception(Uc3Ssm::ConfigResolverError)
+      end
+      it 'returns the value from first root_path when ssm_root_path is a list' do
+        mock_ssm('/root/path/foo', 'bar')
+        mock_ssm('/other/path/foo', 'otherbar')
+        expect(@resolver_prefix_list.send(:parameter_for_key, 'foo')).to eql('bar')
+      end
+      it 'returns the value from second root_path when first root_path doesnt have key' do
+        mock_ssm_not_found('/root/path/foo')
+        mock_ssm('/other/path/foo', 'otherbar')
+        expect(@resolver_prefix_list.send(:parameter_for_key, 'foo')).to eql('otherbar')
       end
     end
   end
@@ -174,6 +212,16 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
           allow(resolver).to receive(:retrieve_ssm_value).with('/foo').and_return(nil)
           resolver.send(:lookup_ssm, '/foo')
         end.to raise_exception('UC3 SSM Error: SSM key /foo not found, no default provided')
+      end
+      it 'returns the value from first root_path when ssm_root_path is a list' do
+        mock_ssm('/root/path/foo', 'bar')
+        mock_ssm('/other/path/foo', 'otherbar')
+        expect(@resolver_prefix_list.send(:lookup_ssm, 'foo')).to eql('bar')
+      end
+      it 'returns the value from second root_path when first root_path doesnt have key' do
+        mock_ssm_not_found('/root/path/foo')
+        mock_ssm('/other/path/foo', 'otherbar')
+        expect(@resolver_prefix_list.send(:lookup_ssm, 'foo')).to eql('otherbar')
       end
     end
 
