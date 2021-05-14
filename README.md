@@ -10,9 +10,10 @@ Intended for use by CDL UC3 services.  We rely on EC2 instance profiles to provi
 
 ### Parameters
 
-- `ssm_root_path`: prefix to apply to all parameter name lookups.  This must be
-  a fully qualified parameter path, i.e. it must start with a forward slash
-  ('/').  Defaults to value of environment var `SSM_ROOT_PATH` if defined.
+- `ssm_root_path`: colon separated list of path prefixes to apply to all
+  parameter name lookups.  Each path prefix in `ssm_root_path` must be a fully
+  qualified parameter path, i.e. it must start with a forward slash ('/').
+  Defaults to value of environment var `SSM_ROOT_PATH` if defined.
 
 - `region`: AWS region in which to perform the SSM lookup.  Defaults to value
   of environment var `AWS_REGION` if defined, or failing that, to `us-west-2`. 
@@ -25,7 +26,7 @@ Intended for use by CDL UC3 services.  We rely on EC2 instance profiles to provi
 - `ssm_skip_resolution`: boolean flag.   When set, no SSM ParameterStore
   lookups will occur.  Key lookups fall back to local environment lookups or to
   defined default values.  Defaults to value of environment var
-  `SSM_SKIP_RESOLUTION` if defined.
+  `SSM_SKIP_RESOLUTION`, or to 'false' if `SSM_SKIP_RESOLUTION` is not defined.
 
 
 ### Instantiation 
@@ -43,7 +44,7 @@ Explicit parameter declaration.  All unqualified lookup keys will have the
 
 ```ruby
 myResolver = Uc3Ssm::ConfigResolver.new(
-  ssm_root_path: "/my/root/path"
+  ssm_root_path: "/my/root/path:/my/other/root/path"
   region: "us-west-2",
 )
 ```
@@ -51,7 +52,7 @@ myResolver = Uc3Ssm::ConfigResolver.new(
 Implicit parameter declaration using environment vars.
 
 ```ruby
-ENV['SSM_ROOT_PATH'] = '/my/other/root/path'
+ENV['SSM_ROOT_PATH'] = '/my/root/path:/my/other/root/path'
 ENV['AWS_REGION'] = 'us-west-2'
 myResolver = Uc3Ssm::ConfigResolver.new()
 ```
@@ -65,8 +66,12 @@ perform a simple lookup for a single ssm parameter.
 
 When `key` is prefixed be a forward slash (e.g. `/cleverman` or
 `/price/tea/china`), it is considered to be a fully qualified parameter name
-and is passed 'as is' to SSM.  If not so prefixed, then `ssm_root_path` is
-prepended to `key` to form a fully qualified parameter name.
+and is passed 'as is' to SSM.
+
+If `key` is not fully qaulified, then each path prefix in `ssm_root_path` is
+prepended to `key` to form a fully qualified parameter name.  A lookup is
+performed for each such fully qualified parameter name in order until a value
+is found or all lookups fail.
 
 NOTE: if `ssm_root_path` is not defined, and `key` is unqualified (no forward
 slash prefix), an exception is thrown.
@@ -75,12 +80,15 @@ slash prefix), an exception is thrown.
 Example:
 
 ```ruby
-myResolver = Uc3Ssm::ConfigResolver.new(ssm_root_path: "/my/root/path")
+myResolver = Uc3Ssm::ConfigResolver.new(
+  ssm_root_path: "/my/root/path:/my/other/root/path"
+)
 myResolver.parameter_for_key('/cheese/blue')
 # returns value for parameter name '/cheese/blue'
 
 myResolver.parameter_for_key('blee')
-# returns value for parameter name '/my/root/path/blee'
+# performs a lookup for parameter name '/my/root/path/blee'.`
+# if this is not found, performs a lookup for '/my/other/root/path/blee'.
 
 myDefaultResolver = Uc3Ssm::ConfigResolver.new()
 myDefaultResolver.parameter_for_key('blee')
@@ -102,9 +110,10 @@ client_secret = ssm.parameter_for_key('client_secret') || ''
 perform a lookup for all parameters prefixed by `options['path']`.
 
 As with `myResolver.parameter_for_key(key)`, when `options[path]` is not fully
-qualified, `ssm_root_path` is prepended to `path` to form a fully qualified
-parameter path.  If `options['path'] is not specified, then the search is done
-with `ssm_root_path.
+qualified, each path prefix in `ssm_root_path` is prepended to `path` to form a
+fully qualified parameter path.  If `options['path'] is not specified, then the
+search is done for each path prefix in `ssm_root_path`.  Returns a list of
+parameters which is the union of all searches made.
 
 All other keys in `options` are passed to `Aws::SSM::Client.get_parameters_by_path`.
 See https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html#get_parameters_by_path-instance_method
@@ -112,12 +121,14 @@ See https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html#get_para
 Example:
 
 ```ruby
-myResolver = Uc3Ssm::ConfigResolver.new(ssm_root_path: "/my/base/path")
+myResolver = Uc3Ssm::ConfigResolver.new(
+  ssm_root_path: "/my/base/path:/my/other/path"
+)
 myResolver.parameter_for_key(path: 'args')
-# returns values for all parameter names directly under "/my/base/path/args"
+# returns values for all parameter names directly under both `/my/base/path/args` and `/my/other/path`.`
 
 myResolver.parameter_for_key(path: 'args', resursive: true)
-# returns values for all parameter names recursively starting with "/my/base/path/args"
+# returns values for all parameter names recursively under both `/my/base/path/args` and `/my/other/path`.
 ```
 
 

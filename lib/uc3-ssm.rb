@@ -22,20 +22,28 @@ module Uc3Ssm
     #          Not needed if AWS_REGION is configured.
     # ssm_root_path - prefix to apply to all key lookups.
     #                 This allows the same config to be used in prod and non prod envs.
+    #                 Can be a list of path strings separated by ':', in which case the
+    #                 we search for keys under each path sequentially, returning the value
+    #                 of the first matching key found.  Example:
+    #                   ssm_root_path: '/prog/srvc/subsrvc/env:/prod/srvc/subsrvc/default'
     # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
     def initialize(**options)
+      # see issue #9 - @regex should not be a user definable option
       dflt_regex = '^(.*)\\{!(ENV|SSM):\\s*([^\\}!]*)(!DEFAULT:\\s([^\\}]*))?\\}(.*)$'
-      dflt_ssm_root_path = ENV['SSM_ROOT_PATH'] || ''
-      dflt_region = ENV['AWS_REGION'] || 'us-west-2'
-      @ssm_skip_resolution = ENV.key?('SSM_SKIP_RESOLUTION')
+      @regex = options.fetch(:regex, dflt_regex)
 
-      @logger = options.fetch(:logger, Logger.new(STDOUT))
+      # see issue #10 - @ssm_skip_resolution only settable as ENV var
+      @ssm_skip_resolution = ENV.key?('SSM_SKIP_RESOLUTION')
+      # dflt_ssm_skip_resolution = ENV['SSM_SKIP_RESOLUTION'] || false
+      # @ssm_skip_resolution = options.fetch(:ssm_skip_resolution, dflt_ssm_skip_resolution)
+
+      dflt_region = ENV['AWS_REGION'] || 'us-west-2'
+      dflt_ssm_root_path = ENV['SSM_ROOT_PATH'] || ''
 
       @region = options.fetch(:region, dflt_region)
-      @regex = options.fetch(:regex, dflt_regex)
       @ssm_root_path = sanitize_root_path(options.fetch(:ssm_root_path, dflt_ssm_root_path))
       @def_value = options.fetch(:def_value, '')
-
+      @logger = options.fetch(:logger, Logger.new(STDOUT))
       @client = Aws::SSM::Client.new(region: @region) unless @ssm_skip_resolution
     rescue Aws::Errors::MissingRegionError
       raise ConfigResolverError, 'No AWS region defined. Either set ENV["AWS_REGION"] or pass in `region: [region]`'
@@ -69,31 +77,54 @@ module Uc3Ssm
     # Retrieve all key+values for a path (using the ssm_root_path if none is specified)
     # See https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html#get_parameters_by_path-instance_method
     # details on available `options`
+    # rubocop:disable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity
     def parameters_for_path(**options)
       return [] if @ssm_skip_resolution
 
-      options[:path] = options[:path].nil? ? @ssm_root_path : sanitize_parameter_key(options[:path])
-      resp = @client.get_parameters_by_path(options)
-      !resp.nil? && resp.parameters.any? ? resp.parameters : []
+      param_list = []
+      path_list = options[:path].nil? ? @ssm_root_path : sanitize_parameter_key(options[:path])
+      path_list.each do |root_path|
+        begin
+          options[:path] = root_path
+          resp = @client.get_parameters_by_path(options)
+          param_list += resp.parameters if !resp.nil? && resp.parameters.any?
+        rescue Aws::SSM::Errors::ParameterNotFound
+          @logger.debug "ParameterNotFound for path '#{root_path}' in parameters_by_path"
+          next
+        end
+      end
+
+      param_list
     rescue Aws::Errors::MissingCredentialsError
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     end
+    # rubocop:enable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity
 
     # Retrieve a value for a single key
     def parameter_for_key(key)
-      key = sanitize_parameter_key(key)
-      retrieve_ssm_value(key)
+      return key if @ssm_skip_resolution
+
+      keylist = sanitize_parameter_key(key)
+      keylist.each do |k|
+        val = retrieve_ssm_value(k)
+        return val unless val.nil?
+      end
     end
 
     private
 
-    # Ensure root_path starts and ends with '/'
+    # Split root_path string into an array of root_paths.
+    # Ensure each root_path starts and ends with '/'
     def sanitize_root_path(root_path)
-      return root_path if root_path.empty?
+      return [] if root_path.empty?
 
-      raise ConfigResolverError, 'ssm_root_path must start with forward slash' unless root_path.start_with?('/')
+      root_path_list = []
+      root_path.split(':').each do |path|
+        raise ConfigResolverError, 'ssm_root_path must start with forward slash' unless path.start_with?('/')
 
-      root_path.end_with?('/') ? root_path : root_path + '/'
+        root_path_list.push(path.end_with?('/') ? path : path + '/')
+      end
+      root_path_list
     end
 
     def return_hash(hash, return_key = nil)
@@ -159,14 +190,13 @@ module Uc3Ssm
       raise ConfigResolverError, "Environment variable #{key} not found, no default provided"
     end
 
-    # rubocop:disable Metrics/MethodLength
     def lookup_ssm(key, defval = nil)
-      key = sanitize_parameter_key(key)
-      begin
-        val = retrieve_ssm_value(key)
+      return key if @ssm_skip_resolution
+
+      keylist = sanitize_parameter_key(key)
+      keylist.each do |k|
+        val = retrieve_ssm_value(k)
         return val unless val.nil?
-      rescue ConfigResolverError
-        @logger.warn "SSM key #{key} not found"
       end
       return defval unless defval.nil?
 
@@ -175,17 +205,25 @@ module Uc3Ssm
 
       raise ConfigResolverError, "SSM key #{key} not found, no default provided"
     end
-    # rubocop:enable Metrics/MethodLength
 
-    # Prepend ssm_root_path to `key` to make fully qualified parameter name
+    # Return an array of fully qualified parameter names. For each root_path in
+    # @ssm_root_path prepend root_path to `key` to make fully qualified
+    # parameter name.
     def sanitize_parameter_key(key)
       key_missing_msg = 'SSM paramter name not valid.  Must be a non-empty string.'
       raise ConfigResolverError, key_missing_msg.to_s if key.nil? || key.empty?
 
-      key_not_qualified_msg = 'SSM parameter name is not fully qualified and no ssm_root_path defined.'
-      raise ConfigResolverError, key_not_qualified_msg.to_s if !key.start_with?('/') && @ssm_root_path.empty?
+      return [key] if key.start_with?('/')
 
-      "#{@ssm_root_path}#{key}".strip
+      key_not_qualified_msg = 'SSM parameter name is not fully qualified and no ssm_root_path defined.'
+      raise ConfigResolverError, key_not_qualified_msg.to_s if @ssm_root_path.empty?
+
+      keylist = []
+      @ssm_root_path.each do |root_path|
+        keylist.push("#{root_path}#{key}")
+      end
+
+      keylist
     end
 
     # Attempt to retrieve the value from AWS SSM
@@ -193,6 +231,9 @@ module Uc3Ssm
       return key if @ssm_skip_resolution
 
       @client.get_parameter(name: key)[:parameter][:value]
+    rescue Aws::SSM::Errors::ParameterNotFound
+      @logger.debug "ParameterNotFound for key '#{key}' in retrieve_ssm_value"
+      nil
     rescue Aws::Errors::MissingCredentialsError
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     rescue StandardError => e
