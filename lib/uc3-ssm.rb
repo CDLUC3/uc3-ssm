@@ -86,8 +86,7 @@ module Uc3Ssm
       path_list.each do |root_path|
         begin
           options[:path] = root_path
-          resp = @client.get_parameters_by_path(options)
-          param_list += resp.parameters if !resp.nil? && resp.parameters.any?
+          param_list += fetch_param_list(options)
         rescue Aws::SSM::Errors::ParameterNotFound
           @logger.debug "ParameterNotFound for path '#{root_path}' in parameters_by_path"
           next
@@ -239,6 +238,20 @@ module Uc3Ssm
     rescue StandardError => e
       raise ConfigResolverError, "Cannot read SSM parameter #{key} - #{e.message}"
     end
+
+    # Recursively gather the parameters from SSM
+    def fetch_param_list(**options)
+      param_list = []
+      resp = @client.get_parameters_by_path(options)
+      return param_list unless resp.present? && resp.parameters.any?
+
+      param_list += resp.parameters
+      options[:next_token] = resp.next_token
+
+      param_list += fetch_param_list(options) if options[:next_token].present?
+      param_list
+    end
+
   end
   # rubocop:enable Metrics/ClassLength
 end
