@@ -77,7 +77,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
       it 'throws ConfigResolverError if no ssm_root_path and path is not fully qualified' do
         expect do
           @resolver.parameters_for_path(path: 'badpath')
-        end.to raise_exception(Uc3Ssm::ConfigResolverError) 
+        end.to raise_exception(Uc3Ssm::ConfigResolverError)
       end
       it 'searches over ssm_root_path when options[path] not specified' do
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path).with(path: '/root/path/')
@@ -121,6 +121,15 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path)
             .with(path: '/other/path/foo').and_return(resp2)
         expect(@resolver_prefix_list.parameters_for_path(path: 'foo')).to eql(%w[c d])
+      end
+      it 'returns more than 10 params' do
+        resp1 = OpenStruct.new(parameters: %w[0 1 2 3 4 5 6 7 8 9], next_token: "foo")
+        resp2 = OpenStruct.new(parameters: %w[a])
+        allow_any_instance_of(Aws::SSM::Client).to receive(:fetch_param_list)
+            .with(path: '/root/path/foo').and_return(resp1)
+        allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path)
+            .with(path: '/other/path/foo', next_token: "foo").and_return(resp2)
+        expect(@resolver_prefix_list.parameters_for_path(path: 'foo')).to eql(%w[0 1 2 3 4 5 6 7 8 9 a])
       end
     end
 
