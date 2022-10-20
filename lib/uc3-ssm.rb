@@ -92,6 +92,7 @@ pp path_list
           options[:path] = root_path
 
 p "GEM - PATH: #{options[:path]}"
+pp options
 
           param_list += fetch_param_list(options)
         rescue Aws::SSM::Errors::ParameterNotFound
