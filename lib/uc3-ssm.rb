@@ -83,18 +83,10 @@ module Uc3Ssm
 
       param_list = []
       path_list = options[:path].nil? ? @ssm_root_path : sanitize_parameter_key(options[:path])
-
-p "GEM - PATH LIST:"      
-pp path_list
-
       path_list.each do |root_path|
         begin
           options[:path] = root_path
-
-p "GEM - PATH: #{options[:path]}"
-pp options
-
-          param_list += fetch_param_list(options)
+          param_list += fetch_param_list(**options)
         rescue Aws::SSM::Errors::ParameterNotFound
           @logger.debug "ParameterNotFound for path '#{root_path}' in parameters_by_path"
           next
@@ -249,19 +241,13 @@ pp options
 
     # Recursively gather the parameters from SSM
     def fetch_param_list(**options)
-
-pp "HERE!"
-
       param_list = []
       resp = @client.get_parameters_by_path(options)
       return param_list unless resp.present? && resp.parameters.any?
 
       param_list += resp.parameters
       options[:next_token] = resp.next_token
-
-p "GEM - NEXT TOKEN: #{options[:next_token]}"
-
-      param_list += fetch_param_list(options) if options[:next_token].present?
+      param_list += fetch_param_list(**options) if options[:next_token].present?
       param_list
     end
 
