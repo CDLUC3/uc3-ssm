@@ -249,6 +249,9 @@ pp options
 
     # Recursively gather the parameters from SSM
     def fetch_param_list(**options)
+
+pp "HERE!"
+
       param_list = []
       resp = @client.get_parameters_by_path(options)
       return param_list unless resp.present? && resp.parameters.any?
