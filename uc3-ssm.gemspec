@@ -21,6 +21,7 @@ Gem::Specification.new do |spec|
 
   spec.add_runtime_dependency('aws-sdk-ssm', '~> 1.84')
   spec.add_runtime_dependency('logger', '~> 1.4')
+  spec.add_runtime_dependency('psych', '< 4')
   spec.add_runtime_dependency('yaml', '~> 0.1')
 
   # Requirements for running RSpec
