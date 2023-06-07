@@ -86,7 +86,7 @@ module Uc3Ssm
       path_list.each do |root_path|
         begin
           options[:path] = root_path
-          param_list += fetch_param_list(options)
+          param_list += fetch_param_list(**options)
         rescue Aws::SSM::Errors::ParameterNotFound
           @logger.debug "ParameterNotFound for path '#{root_path}' in parameters_by_path"
           next
@@ -247,8 +247,7 @@ module Uc3Ssm
 
       param_list += resp.parameters
       options[:next_token] = resp.next_token
-
-      param_list += fetch_param_list(options) if options[:next_token].present?
+      param_list += fetch_param_list(**options) if options[:next_token].present?
       param_list
     end
 
