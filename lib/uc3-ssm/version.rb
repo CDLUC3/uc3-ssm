@@ -1,5 +1,5 @@
 # frozen_string_literal: true
 
 module Uc3Ssm
-  VERSION = '0.3.6'
+  VERSION = '0.3.7'
 end
