@@ -21,6 +21,9 @@ Gem::Specification.new do |spec|
 
   spec.add_runtime_dependency('aws-sdk-ssm', '~> 1.84')
   spec.add_runtime_dependency('logger', '~> 1.4')
+  # Locking Psych to < 4.0 because it breaks the use of YAML aliases.
+  # See https://stackoverflow.com/questions/71191685/visit-psych-nodes-alias-unknown-alias-default-psychbadalias/71192990#71192990
+  spec.add_runtime_dependency('psych', '< 4')
   spec.add_runtime_dependency('yaml', '~> 0.1')
 
   # Requirements for running RSpec
