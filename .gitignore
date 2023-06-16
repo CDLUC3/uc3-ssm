@@ -5,3 +5,4 @@ Gemfile.lock
 *.swp
 .bundle
 .vscode
+vendor/

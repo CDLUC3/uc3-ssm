@@ -57,7 +57,7 @@ module Uc3Ssm
       raise ConfigResolverError, "Config file #{file} not found!" unless File.exist?(file)
       raise ConfigResolverError, "Config file #{file} is empty!" unless File.size(file).positive?
 
-      config = YAML.load_file(file)
+      config = YAML.safe_load(file)
       resolve_hash_values(hash: config, resolve_key: resolve_key, return_key: return_key)
     end
 
