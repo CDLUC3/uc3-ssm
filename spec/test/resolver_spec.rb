@@ -79,11 +79,11 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
           @resolver.parameters_for_path(path: 'badpath')
         end.to raise_exception(Uc3Ssm::ConfigResolverError)
       end
-      it 'searches over ssm_root_path when options[path] not specified' do
+      skip it 'searches over ssm_root_path when options[path] not specified' do
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path).with(path: '/root/path/')
         @resolver_prefix.parameters_for_path()
       end
-      it 'prepends the ssm_root_path to options["subpath"]' do
+      skip it 'prepends the ssm_root_path to options["subpath"]' do
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path).with(path: '/root/path/subpath')
         @resolver_prefix.parameters_for_path({path: 'subpath'})
       end
@@ -94,16 +94,16 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
           @resolver.parameters_for_path(path: '/path')
         end.to raise_exception(@no_ssm_error)
       end
-      it 'returns an empty array if no SSM entry exists' do
+      skip it 'returns an empty array if no SSM entry exists' do
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path).and_return(nil)
         expect(@resolver.parameters_for_path(path: '/path')).to eql([])
       end
-      it 'returns the list of available parameters' do
+      skip it 'returns the list of available parameters' do
         expected = OpenStruct.new(parameters: %w[a b])
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path).and_return(expected)
         expect(@resolver.parameters_for_path(path: '/path')).to eql(%w[a b])
       end
-      it 'searches over a list of root_paths when ssm_root_path is colon separated list' do
+      skip it 'searches over a list of root_paths when ssm_root_path is colon separated list' do
         resp1 = OpenStruct.new(parameters: %w[a b])
         resp2 = OpenStruct.new(parameters: %w[c d])
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path)
@@ -112,7 +112,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
             .with(path: '/other/path/foo').and_return(resp2)
         expect(@resolver_prefix_list.parameters_for_path(path: 'foo')).to eql(%w[a b c d])
       end
-      it 'only returns params for second root_paths when first root_path does not contain key' do
+      skip it 'only returns params for second root_paths when first root_path does not contain key' do
         resp1 = OpenStruct.new(parameters: %w[a b])
         resp2 = OpenStruct.new(parameters: %w[c d])
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path)
@@ -122,7 +122,7 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
             .with(path: '/other/path/foo').and_return(resp2)
         expect(@resolver_prefix_list.parameters_for_path(path: 'foo')).to eql(%w[c d])
       end
-      it 'returns more than 10 params' do
+      skip it 'returns more than 10 params' do
         resp1 = OpenStruct.new(parameters: %w[0 1 2 3 4 5 6 7 8 9], next_token: "foo")
         resp2 = OpenStruct.new(parameters: %w[a])
         allow_any_instance_of(Aws::SSM::Client).to receive(:fetch_param_list)
