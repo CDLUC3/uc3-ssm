@@ -228,7 +228,6 @@ module Uc3Ssm
     # Attempt to retrieve the value from AWS SSM
     def retrieve_ssm_value(key)
       return key if @ssm_skip_resolution
-      puts 'get with decrypt '
       @client.get_parameter(name: key, with_decryption: true)[:parameter][:value]
     rescue Aws::SSM::Errors::ParameterNotFound
       @logger.debug "ParameterNotFound for key '#{key}' in retrieve_ssm_value"
