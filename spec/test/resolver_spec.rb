@@ -46,19 +46,19 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
         "ARN": "arn:aws:ssm:us-west-2:1111111111:parameter#{name}"
       }
     }
-    allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameter).with({ name: name })
+    allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameter).with({ name: name, with_decryption: true })
                                                                       .and_return(param_json)
   end
   # rubocop:enable Metrics/MethodLength
 
   def mock_ssm_failure(name, err)
-    allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameter).with({ name: name })
+    allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameter).with({ name: name, with_decryption: true })
                                                                       .and_raise(err)
   end
 
   def mock_ssm_not_found(name)
     allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameter)
-        .with({ name: name })
+        .with({ name: name, with_decryption: true })
         .and_raise(Aws::SSM::Errors::ParameterNotFound.new({}, name))
   end
 
