@@ -39,6 +39,7 @@ module Uc3Ssm
 
       dflt_region = ENV['AWS_REGION'] || 'us-west-2'
       dflt_ssm_root_path = ENV['SSM_ROOT_PATH'] || ''
+      raise ConfigResolverError, 'No SSM_ROOT_PATH defined. Please set your ENV[\'SSM_ROOT_PATH\'] variable.'
 
       @region = options.fetch(:region, dflt_region)
       @ssm_root_path = sanitize_root_path(options.fetch(:ssm_root_path, dflt_ssm_root_path))
