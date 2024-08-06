@@ -6,3 +6,4 @@ Gemfile.lock
 .bundle
 .vscode
 vendor/
+doc/

@@ -1,0 +1,14 @@
+version: 0.2
+
+phases:
+
+  build:
+    on-failure: ABORT
+    commands:
+      - bundle exec rdoc lib/*.rb
+      - rm -rf api/uc3-ssm
+      - mkdir -p api/uc3-ssm/ruby
+      - cp -r doc/* api/uc3-ssm/ruby
+      - echo aws s3 cp --recursive api s3://${S3CFBUCKET}/api 
+      - aws s3 cp --recursive api s3://${S3CFBUCKET}/api
+      - aws cloudfront create-invalidation --distribution-id ${CFDISTRIBUTIONID} --paths /* --region us-east-1
