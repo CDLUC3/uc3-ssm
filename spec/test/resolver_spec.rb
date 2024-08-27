@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
-require 'spec_helper.rb'
+require 'spec_helper'
 
-# rubocop:disable Metrics/BlockLength
 RSpec.describe 'basic_resolver_tests', type: :feature do
   def basic_hash
     {
@@ -34,32 +33,31 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
     @no_ssm_error = 'UC3 SSM Error: No AWS credentials available. Make sure the server has access to the aws-sdk'
   end
 
-  # rubocop:disable Metrics/MethodLength
   def mock_ssm(name, value)
     param_json = {
-      "parameter": {
-        "name": name,
-        "lastModifiedDate": 1_593_459_594.587,
-        "value": value,
-        "version": 1,
-        "type": 'String',
-        "ARN": "arn:aws:ssm:us-west-2:1111111111:parameter#{name}"
+      parameter: {
+        name: name,
+        lastModifiedDate: 1_593_459_594.587,
+        value: value,
+        version: 1,
+        type: 'String',
+        ARN: "arn:aws:ssm:us-west-2:1111111111:parameter#{name}"
       }
     }
     allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameter).with({ name: name, with_decryption: true })
-                                                                      .and_return(param_json)
+      .and_return(param_json)
   end
   # rubocop:enable Metrics/MethodLength
 
   def mock_ssm_failure(name, err)
     allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameter).with({ name: name, with_decryption: true })
-                                                                      .and_raise(err)
+      .and_raise(err)
   end
 
   def mock_ssm_not_found(name)
     allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameter)
-        .with({ name: name, with_decryption: true })
-        .and_raise(Aws::SSM::Errors::ParameterNotFound.new({}, name))
+      .with({ name: name, with_decryption: true })
+      .and_raise(Aws::SSM::Errors::ParameterNotFound.new({}, name))
   end
 
   after(:each) do
@@ -81,11 +79,11 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
       end
       skip it 'searches over ssm_root_path when options[path] not specified' do
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path).with(path: '/root/path/')
-        @resolver_prefix.parameters_for_path()
+        @resolver_prefix.parameters_for_path
       end
       skip it 'prepends the ssm_root_path to options["subpath"]' do
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path).with(path: '/root/path/subpath')
-        @resolver_prefix.parameters_for_path({path: 'subpath'})
+        @resolver_prefix.parameters_for_path({ path: 'subpath' })
       end
       it 'throws an AWS Credentials error if SSM could not be accessed' do
         err = Aws::Errors::MissingCredentialsError.new
@@ -107,28 +105,28 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
         resp1 = OpenStruct.new(parameters: %w[a b])
         resp2 = OpenStruct.new(parameters: %w[c d])
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path)
-            .with(path: '/root/path/foo').and_return(resp1)
+          .with(path: '/root/path/foo').and_return(resp1)
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path)
-            .with(path: '/other/path/foo').and_return(resp2)
+          .with(path: '/other/path/foo').and_return(resp2)
         expect(@resolver_prefix_list.parameters_for_path(path: 'foo')).to eql(%w[a b c d])
       end
       skip it 'only returns params for second root_paths when first root_path does not contain key' do
-        resp1 = OpenStruct.new(parameters: %w[a b])
+        OpenStruct.new(parameters: %w[a b])
         resp2 = OpenStruct.new(parameters: %w[c d])
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path)
-            .with(path: '/root/path/foo')
-            .and_raise(Aws::SSM::Errors::ParameterNotFound.new({}, '/root/path/foo'))
+          .with(path: '/root/path/foo')
+          .and_raise(Aws::SSM::Errors::ParameterNotFound.new({}, '/root/path/foo'))
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path)
-            .with(path: '/other/path/foo').and_return(resp2)
+          .with(path: '/other/path/foo').and_return(resp2)
         expect(@resolver_prefix_list.parameters_for_path(path: 'foo')).to eql(%w[c d])
       end
       skip it 'returns more than 10 params' do
-        resp1 = OpenStruct.new(parameters: %w[0 1 2 3 4 5 6 7 8 9], next_token: "foo")
+        resp1 = OpenStruct.new(parameters: %w[0 1 2 3 4 5 6 7 8 9], next_token: 'foo')
         resp2 = OpenStruct.new(parameters: %w[a])
         allow_any_instance_of(Aws::SSM::Client).to receive(:fetch_param_list)
-            .with(path: '/root/path/foo').and_return(resp1)
+          .with(path: '/root/path/foo').and_return(resp1)
         allow_any_instance_of(Aws::SSM::Client).to receive(:get_parameters_by_path)
-            .with(path: '/other/path/foo', next_token: "foo").and_return(resp2)
+          .with(path: '/other/path/foo', next_token: 'foo').and_return(resp2)
         expect(@resolver_prefix_list.parameters_for_path(path: 'foo')).to eql(%w[0 1 2 3 4 5 6 7 8 9 a])
       end
     end
@@ -276,10 +274,10 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
 
     describe '#return_hash(hash, return_key)' do
       it 'returns the hash as-is if the return_key is not specified' do
-        expect(@resolver.send(:return_hash, { 'one': 1 }, nil)).to eql({ 'one': 1 })
+        expect(@resolver.send(:return_hash, { one: 1 }, nil)).to eql({ one: 1 })
       end
       it 'returns the hash as-is if the hash does not contain the return_key' do
-        expect(@resolver.send(:return_hash, { 'one': 1 }, 'two')).to eql({ 'one': 1 })
+        expect(@resolver.send(:return_hash, { one: 1 }, 'two')).to eql({ one: 1 })
       end
       it 'returns the value of the return_key' do
         expect(@resolver.send(:return_hash, { one: 1 }, :one)).to eql(1)
@@ -300,7 +298,6 @@ RSpec.describe 'basic_resolver_tests', type: :feature do
       end
     end
   end
-
 
   it 'Test Basic static values' do
     config_in = basic_hash

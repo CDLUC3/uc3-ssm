@@ -1,11 +1,9 @@
 # frozen_string_literal: true
 
-require 'spec_helper.rb'
+require 'spec_helper'
 require 'aws-sdk-ssm'
 
-# rubocop:disable Metrics/BlockLength
 RSpec.describe 'Test resolver object initialization. ', type: :feature do
-
   context 'ConfigResolver.new' do
     describe 'with no user provided options' do
       myResolver = Uc3Ssm::ConfigResolver.new
@@ -44,14 +42,14 @@ RSpec.describe 'Test resolver object initialization. ', type: :feature do
         expect(myResolver.instance_variable_get(:@def_value)).to eq('NOT_APPLICABLE')
       end
       # see issue #10 - @ssm_skip_resolution only settable as ENV var
-      #it 'sets @ssm_skip_resolution to true.' do
+      # it 'sets @ssm_skip_resolution to true.' do
       #  expect(myResolver.instance_variable_get(:@ssm_skip_resolution)).to be true
-      #end
+      # end
     end
 
     describe 'where ssm_root_path is list of colon separated paths' do
       myResolver = Uc3Ssm::ConfigResolver.new(
-        ssm_root_path: '/root/path/:/no/trailing/slash',
+        ssm_root_path: '/root/path/:/no/trailing/slash'
       )
       it '@ssm_root_path is array with 2 paths.' do
         expect(myResolver.instance_variable_get(:@ssm_root_path).length).to eq(2)
@@ -63,9 +61,9 @@ RSpec.describe 'Test resolver object initialization. ', type: :feature do
 
     describe 'when ssm_root_path does not start with forward slash.' do
       it 'raises exception.' do
-        expect {
+        expect do
           Uc3Ssm::ConfigResolver.new(ssm_root_path: 'no/starting/slash/')
-        }.to raise_exception(Uc3Ssm::ConfigResolverError)
+        end.to raise_exception(Uc3Ssm::ConfigResolverError)
       end
     end
 
@@ -89,3 +87,4 @@ RSpec.describe 'Test resolver object initialization. ', type: :feature do
     end
   end
 end
+# rubocop:enable Metrics/BlockLength

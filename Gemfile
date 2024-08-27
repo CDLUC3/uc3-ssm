@@ -2,5 +2,9 @@
 
 source 'https://rubygems.org'
 
-# Specify your gem's dependencies in the gemspec
-gemspec
+gem 'aws-sdk-ssm'
+gem 'byebug'
+gem 'logger'
+gem 'rspec'
+gem 'rubocop'
+gem 'yaml'
