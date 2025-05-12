@@ -2,7 +2,6 @@
 *.gem
 .byebug_history
 *.swp
-.bundle
 .vscode
 vendor/
 doc/
