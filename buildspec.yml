@@ -5,6 +5,7 @@ phases:
   build:
     on-failure: ABORT
     commands:
+      - ruby -v
       - bundle install
       - bundle exec rdoc lib/*.rb
       - rm -rf api/uc3-ssm
