@@ -4,7 +4,7 @@ phases:
 
   install:
     runtime-versions:
-      ruby: 3.2.8
+      ruby: 3.4.3
 
   build:
     on-failure: ABORT
