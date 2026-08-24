@@ -75,7 +75,7 @@ module Uc3Ssm
     # Retrieve all key+values for a path (using the ssm_root_path if none is specified)
     # See https://docs.aws.amazon.com/sdk-for-ruby/v2/api/Aws/SSM/Client.html#get_parameters_by_path-instance_method
     # details on available `options`
-    # rubocop:disable Metrics/MethodLength
+    # rubocop:disable-next Metrics/MethodLength
     def parameters_for_path(**options)
       return [] if @ssm_skip_resolution
 
@@ -93,7 +93,6 @@ module Uc3Ssm
     rescue Aws::Errors::MissingCredentialsError
       raise ConfigResolverError, 'No AWS credentials available. Make sure the server has access to the aws-sdk'
     end
-    # rubocop:enable Metrics/MethodLength
 
     # Retrieve a value for a single key
     def parameter_for_key(key)
