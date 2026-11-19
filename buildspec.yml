@@ -4,7 +4,8 @@ phases:
 
   install:
     runtime-versions:
-      ruby: 3.4.12
+      # 3.4.12 is current default
+      # ruby: 3.4.13
 
   build:
     on-failure: ABORT
