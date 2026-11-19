@@ -2,8 +2,8 @@ version: 0.2
 
 phases:
 
-  install:
-    runtime-versions:
+  # install:
+    # runtime-versions:
       # 3.4.12 is current default
       # ruby: 3.4.13
 
